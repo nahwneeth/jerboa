@@ -740,7 +740,7 @@ fun fetchInitialData(
                 auth = account.jwt,
             ),
         )
-        siteViewModel.fetchUnreadCounts(GetUnreadCount(auth = account.jwt))
+//        siteViewModel.fetchUnreadCounts(GetUnreadCount(auth = account.jwt))
     } else {
         Log.d("jerboa", "Fetching posts for anonymous user")
         API.changeLemmyInstance(DEFAULT_INSTANCE)
@@ -753,11 +753,11 @@ fun fetchInitialData(
         )
     }
 
-    siteViewModel.getSite(
-        GetSite(
-            auth = account?.jwt,
-        ),
-    )
+//    siteViewModel.getSite(
+//        GetSite(
+//            auth = account?.jwt,
+//        ),
+//    )
 }
 
 fun imageInputStreamFromUri(ctx: Context, uri: Uri): InputStream {

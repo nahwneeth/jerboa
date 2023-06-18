@@ -3,16 +3,22 @@ package com.jerboa.db
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
+import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+import javax.inject.Inject
 
 const val DEFAULT_FONT_SIZE = 16
 const val UPDATE_APP_CHANGELOG_UNVIEWED = "UPDATE AppSettings SET viewed_changelog = 0"
@@ -138,6 +144,10 @@ interface AppSettingsDao {
 // Declares the DAO as a private property in the constructor. Pass in the DAO
 // instead of the whole database, because you only need access to the DAO
 class AccountRepository(private val accountDao: AccountDao) {
+
+    init {
+        Log.d("Flow Combine", "account repo created")
+    }
 
     // Room executes all queries on a separate thread.
     // Observed Flow will notify the observer when the data has changed.
@@ -377,60 +387,53 @@ abstract class AppDB : RoomDatabase() {
     abstract fun appSettingsDao(): AppSettingsDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDB? = null
-
         fun getDatabase(
             context: Context,
         ): AppDB {
             // if the INSTANCE is not null, then return it,
             // if it is, then create the database
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDB::class.java,
-                    "jerboa",
+            return Room.databaseBuilder(
+                context.applicationContext,
+                AppDB::class.java,
+                "jerboa",
+            )
+                .allowMainThreadQueries()
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12,
+                    MIGRATION_12_13,
+                    MIGRATION_13_14,
                 )
-                    .allowMainThreadQueries()
-                    .addMigrations(
-                        MIGRATION_1_2,
-                        MIGRATION_2_3,
-                        MIGRATION_3_4,
-                        MIGRATION_4_5,
-                        MIGRATION_5_6,
-                        MIGRATION_6_7,
-                        MIGRATION_7_8,
-                        MIGRATION_8_9,
-                        MIGRATION_9_10,
-                        MIGRATION_10_11,
-                        MIGRATION_11_12,
-                        MIGRATION_12_13,
-                        MIGRATION_13_14,
-                    )
-                    // Necessary because it can't insert data on creation
-                    .addCallback(object : Callback() {
-                        override fun onOpen(db: SupportSQLiteDatabase) {
-                            super.onCreate(db)
-                            Executors.newSingleThreadExecutor().execute {
-                                db.insert(
-                                    "AppSettings",
-                                    CONFLICT_IGNORE, // Ensures it won't overwrite the existing data
-                                    ContentValues(2).apply {
-                                        put("id", 1)
-                                    },
-                                )
-                            }
+                // Necessary because it can't insert data on creation
+                .addCallback(object : Callback() {
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+                        Executors.newSingleThreadExecutor().execute {
+                            db.insert(
+                                "AppSettings",
+                                CONFLICT_IGNORE, // Ensures it won't overwrite the existing data
+                                ContentValues(2).apply {
+                                    put("id", 1)
+                                },
+                            )
                         }
-                    }).build()
-                INSTANCE = instance
-                // return instance
-                instance
-            }
+                    }
+                }).build()
         }
     }
 }
 
-class AccountViewModel(private val repository: AccountRepository) : ViewModel() {
+@HiltViewModel
+class AccountViewModel @Inject constructor(private val repository: AccountRepository) : ViewModel() {
 
     val allAccounts = repository.allAccounts
 
@@ -464,7 +467,8 @@ class AccountViewModelFactory(private val repository: AccountRepository) :
     }
 }
 
-class AppSettingsViewModel(private val repository: AppSettingsRepository) : ViewModel() {
+@HiltViewModel
+class AppSettingsViewModel @Inject constructor(private val repository: AppSettingsRepository) : ViewModel() {
 
     val appSettings = repository.appSettings
 

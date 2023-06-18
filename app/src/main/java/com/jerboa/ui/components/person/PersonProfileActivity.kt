@@ -16,12 +16,14 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
+import arrow.core.Either
 import com.jerboa.R
 import com.jerboa.VoteType
 import com.jerboa.api.ApiState
@@ -35,22 +37,22 @@ import com.jerboa.datatypes.types.DeletePost
 import com.jerboa.datatypes.types.GetPersonDetails
 import com.jerboa.datatypes.types.SaveComment
 import com.jerboa.datatypes.types.SavePost
+import com.jerboa.datatypes.types.SortType
 import com.jerboa.db.Account
 import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
 import com.jerboa.getLocalizedStringForUserTab
 import com.jerboa.isScrolledToEnd
-import com.jerboa.loginFirstToast
+import com.jerboa.nav.initializeOnce
 import com.jerboa.newVote
 import com.jerboa.pagerTabIndicatorOffset2
 import com.jerboa.scrollToTop
 import com.jerboa.ui.components.comment.CommentNodes
-import com.jerboa.ui.components.comment.edit.CommentEditViewModel
-import com.jerboa.ui.components.comment.reply.CommentReplyViewModel
+import com.jerboa.ui.components.comment.edit.CommentEditDependencies
+import com.jerboa.ui.components.comment.reply.CommentReplyDependencies
 import com.jerboa.ui.components.comment.reply.ReplyItem
 import com.jerboa.ui.components.common.ApiEmptyText
 import com.jerboa.ui.components.common.ApiErrorText
-import com.jerboa.ui.components.common.BottomAppBarAll
 import com.jerboa.ui.components.common.LoadingBar
 import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.common.getPostViewMode
@@ -58,7 +60,7 @@ import com.jerboa.ui.components.common.simpleVerticalScrollbar
 import com.jerboa.ui.components.community.CommunityLink
 import com.jerboa.ui.components.home.SiteViewModel
 import com.jerboa.ui.components.post.PostListings
-import com.jerboa.ui.components.post.edit.PostEditViewModel
+import com.jerboa.ui.components.post.edit.PostEditDependencies
 import com.jerboa.ui.theme.MEDIUM_PADDING
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -66,16 +68,12 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonProfileActivity(
+    personArg: Either<Int, String>,
     savedMode: Boolean,
-    navController: NavController,
-    personProfileViewModel: PersonProfileViewModel,
+    navController: PersonProfileNavController,
     accountViewModel: AccountViewModel,
     siteViewModel: SiteViewModel,
-    commentEditViewModel: CommentEditViewModel,
-    commentReplyViewModel: CommentReplyViewModel,
-    postEditViewModel: PostEditViewModel,
     appSettingsViewModel: AppSettingsViewModel,
-    showVotingArrowsInListView: Boolean,
 ) {
     Log.d("jerboa", "got to person activity")
 
@@ -83,14 +81,28 @@ fun PersonProfileActivity(
     val postListState = rememberLazyListState()
     val ctx = LocalContext.current
     val account = getCurrentAccount(accountViewModel)
-    val bottomAppBarScreen = if (savedMode) {
-        "saved"
-    } else {
-        "profile"
-    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
-    personProfileViewModel.updateSavedOnly(savedMode)
+    val appSettings by appSettingsViewModel.appSettings.observeAsState()
+    val showVotingArrowsInListView = appSettings?.showVotingArrowsInListView ?: true
+
+    val personProfileViewModel: PersonProfileViewModel = viewModel()
+    LaunchedEffect(Unit) {
+        initializeOnce(personProfileViewModel) {
+            val personId = personArg.fold({ it }, { null })
+            val personName = personArg.fold({ null }, { it })
+            getPersonDetails(
+                GetPersonDetails(
+                    person_id = personId,
+                    username = personName,
+                    sort = SortType.New,
+                    auth = account?.jwt,
+                    saved_only = savedMode,
+                ),
+            )
+            updateSavedOnly(savedMode)
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -139,13 +151,9 @@ fun PersonProfileActivity(
                             val firstComment = profileRes.data.comments.firstOrNull()
                             val firstPost = profileRes.data.posts.firstOrNull()
                             if (firstComment !== null) {
-                                navController.navigate(
-                                    "commentReport/${firstComment.comment.id}",
-                                )
+                                navController.toCommentReport.navigate(firstComment.comment.id)
                             } else if (firstPost !== null) {
-                                navController.navigate(
-                                    "postReport/${firstPost.post.id}",
-                                )
+                                navController.toPostReport.navigate(firstPost.post.id)
                             }
                         },
                         navController = navController,
@@ -165,40 +173,10 @@ fun PersonProfileActivity(
                 account = account,
                 scope = scope,
                 postListState = postListState,
-                commentEditViewModel = commentEditViewModel,
-                commentReplyViewModel = commentReplyViewModel,
-                postEditViewModel = postEditViewModel,
                 appSettingsViewModel = appSettingsViewModel,
                 showVotingArrowsInListView = showVotingArrowsInListView,
                 enableDownVotes = siteViewModel.enableDownvotes(),
                 showAvatar = siteViewModel.showAvatar(),
-            )
-        },
-        bottomBar = {
-            BottomAppBarAll(
-                showBottomNav = appSettingsViewModel.appSettings.value?.showBottomNav,
-                screen = bottomAppBarScreen,
-                unreadCount = siteViewModel.getUnreadCountTotal(),
-                onClickProfile = {
-                    account?.id?.also {
-                        navController.navigate(route = "profile/$it")
-                    }
-                },
-                onClickInbox = {
-                    account?.also {
-                        navController.navigate(route = "inbox")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                onClickSaved = {
-                    account?.id?.also {
-                        navController.navigate(route = "profile/$it?saved=${true}")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                navController = navController,
             )
         },
     )
@@ -214,15 +192,12 @@ enum class UserTab {
 @Composable
 fun UserTabs(
     savedMode: Boolean,
-    navController: NavController,
+    navController: PersonProfileNavController,
     personProfileViewModel: PersonProfileViewModel,
     ctx: Context,
     account: Account?,
     scope: CoroutineScope,
     postListState: LazyListState,
-    commentEditViewModel: CommentEditViewModel,
-    commentReplyViewModel: CommentReplyViewModel,
-    postEditViewModel: PostEditViewModel,
     padding: PaddingValues,
     appSettingsViewModel: AppSettingsViewModel,
     showVotingArrowsInListView: Boolean,
@@ -339,7 +314,7 @@ fun UserTabs(
                                         community = cmv.community,
                                         modifier = Modifier.padding(MEDIUM_PADDING),
                                         onClick = { community ->
-                                            navController.navigate(route = "community/${community.id}")
+                                            navController.toCommunity.navigate(community.id)
                                         },
                                         showDefaultIcon = true,
                                     )
@@ -392,7 +367,7 @@ fun UserTabs(
                                         }
                                     },
                                     onPostClick = { pv ->
-                                        navController.navigate(route = "post/${pv.post.id}")
+                                        navController.toPost.navigate(pv.post.id)
                                     },
                                     onSaveClick = { pv ->
                                         account?.also { acct ->
@@ -406,8 +381,12 @@ fun UserTabs(
                                         }
                                     },
                                     onEditPostClick = { pv ->
-                                        postEditViewModel.initialize(pv)
-                                        navController.navigate("postEdit")
+                                        navController.toPostEdit.navigate(
+                                            PostEditDependencies(
+                                                postView = pv,
+                                                onPostEdit = personProfileViewModel::updatePost,
+                                            )
+                                        )
                                     },
                                     onDeletePostClick = { pv ->
                                         account?.also { acct ->
@@ -421,13 +400,13 @@ fun UserTabs(
                                         }
                                     },
                                     onReportClick = { pv ->
-                                        navController.navigate("postReport/${pv.post.id}")
+                                        navController.toPostReport.navigate(pv.post.id)
                                     },
                                     onCommunityClick = { community ->
-                                        navController.navigate(route = "community/${community.id}")
+                                        navController.toCommunity.navigate(community.id)
                                     },
                                     onPersonClick = { personId ->
-                                        navController.navigate(route = "profile/$personId")
+                                        navController.toProfile.navigate(personId)
                                     },
                                     onBlockCommunityClick = { community ->
                                         account?.also { acct ->
@@ -540,11 +519,17 @@ fun UserTabs(
                                         }
                                     },
                                     onReplyClick = { cv ->
-                                        commentReplyViewModel.initialize(
-                                            ReplyItem.CommentItem
-                                                (cv),
+                                        navController.toCommentReply.navigate(
+                                            CommentReplyDependencies(
+                                                ReplyItem.CommentItem(cv),
+                                                // TODO(nahwneeth): how to know if mod or not
+                                                isModerator = false,
+                                            ) {
+                                                if (account?.id == profileRes.data.person_view.person.id) {
+                                                    personProfileViewModel.insertComment(it)
+                                                }
+                                            }
                                         )
-                                        navController.navigate("commentReply")
                                     },
                                     onSaveClick = { cv ->
                                         account?.also { acct ->
@@ -558,17 +543,21 @@ fun UserTabs(
                                         }
                                     },
                                     onPersonClick = { personId ->
-                                        navController.navigate(route = "profile/$personId")
+                                        navController.toProfile.navigate(personId)
                                     },
                                     onCommunityClick = { community ->
-                                        navController.navigate(route = "community/${community.id}")
+                                        navController.toCommunity.navigate(community.id)
                                     },
                                     onPostClick = { postId ->
-                                        navController.navigate(route = "post/$postId")
+                                        navController.toPost.navigate(postId)
                                     },
                                     onEditCommentClick = { cv ->
-                                        commentEditViewModel.initialize(cv)
-                                        navController.navigate("commentEdit")
+                                        navController.toCommentEdit.navigate(
+                                            CommentEditDependencies(
+                                                commentView = cv,
+                                                onCommentEdit = personProfileViewModel::updateComment,
+                                            )
+                                        )
                                     },
                                     onDeleteCommentClick = { cv ->
                                         account?.also { acct ->
@@ -582,10 +571,10 @@ fun UserTabs(
                                         }
                                     },
                                     onReportClick = { cv ->
-                                        navController.navigate("commentReport/${cv.comment.id}")
+                                        navController.toCommentReport.navigate(cv.comment.id)
                                     },
                                     onCommentLinkClick = { cv ->
-                                        navController.navigate("comment/${cv.comment.id}")
+                                        navController.toComment.navigate(cv.comment.id)
                                     },
                                     onFetchChildrenClick = {},
                                     onBlockCreatorClick = { person ->

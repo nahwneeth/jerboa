@@ -24,7 +24,7 @@ class CreatePostViewModel : ViewModel() {
 
     fun createPost(
         form: CreatePost,
-        navController: NavController,
+        onSuccess: OnCreatePost,
     ) {
         viewModelScope.launch {
             createPostRes = ApiState.Loading
@@ -35,8 +35,9 @@ class CreatePostViewModel : ViewModel() {
 
             when (val postRes = createPostRes) {
                 is ApiState.Success -> {
-                    navController.popBackStack()
-                    navController.navigate(route = "post/${postRes.data.post_view.post.id}")
+                    onSuccess(postRes.data.post_view)
+                    // navController.popBackStack()
+                    // navController.navigate(route = "post/${postRes.data.post_view.post.id}")
                 }
                 else -> {}
             }

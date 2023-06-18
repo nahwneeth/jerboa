@@ -24,11 +24,13 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.jerboa.R
 import com.jerboa.UnreadOrAll
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.UnreadOrAllOptionsDialog
 
 @Composable
 fun InboxHeader(
-    navController: NavController = rememberNavController(),
+    navController: NavControllerWrapper,
     selectedUnreadOrAll: UnreadOrAll,
     onClickUnreadOrAll: (UnreadOrAll) -> Unit,
     onClickMarkAllAsRead: () -> Unit,
@@ -56,14 +58,7 @@ fun InboxHeader(
                 selectedUnreadOrAll = selectedUnreadOrAll,
             )
         },
-        navigationIcon = {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.inbox_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
         actions = {
             IconButton(onClick = {
                 showUnreadOrAllOptions = !showUnreadOrAllOptions

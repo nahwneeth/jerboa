@@ -16,6 +16,7 @@ import com.jerboa.datatypes.sampleCommunityView
 import com.jerboa.datatypes.types.CommunityView
 import com.jerboa.datatypes.types.SortType
 import com.jerboa.datatypes.types.SubscribedType
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.IconAndTextDrawerItem
 import com.jerboa.ui.components.common.LargerCircularIcon
 import com.jerboa.ui.components.common.PictrsBannerImage
@@ -125,7 +126,7 @@ fun CommunityHeader(
     onBlockCommunityClick: () -> Unit,
     onClickRefresh: () -> Unit,
     selectedSortType: SortType,
-    navController: NavController = rememberNavController(),
+    navController: CommunityNavController,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     var showSortOptions by remember { mutableStateOf(false) }
@@ -178,14 +179,7 @@ fun CommunityHeader(
                 selectedSortType = selectedSortType,
             )
         },
-        navigationIcon = {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.community_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
         actions = {
             IconButton(onClick = {
                 showSortOptions = !showSortOptions
@@ -229,7 +223,7 @@ fun CommunityMoreDialog(
     onDismissRequest: () -> Unit,
     onBlockCommunityClick: () -> Unit,
     onClickRefresh: () -> Unit,
-    navController: NavController,
+    navController: CommunityNavController,
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -247,7 +241,7 @@ fun CommunityMoreDialog(
                     text = stringResource(R.string.community_community_info),
                     icon = Icons.Outlined.Info,
                     onClick = {
-                        navController.navigate("communitySidebar")
+                        navController.toCommunitySideBar.navigate()
                         onDismissRequest()
                     },
                 )

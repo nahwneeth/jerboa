@@ -35,7 +35,9 @@ import com.jerboa.datatypes.samplePersonView
 import com.jerboa.datatypes.types.PersonView
 import com.jerboa.datatypes.types.SortType
 import com.jerboa.getLocalizedSortingTypeName
+import com.jerboa.nav.NavControllerWrapper
 import com.jerboa.personNameShown
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.DotSpacer
 import com.jerboa.ui.components.common.IconAndTextDrawerItem
 import com.jerboa.ui.components.common.ImageViewerDialog
@@ -159,7 +161,7 @@ fun PersonProfileHeader(
     onBlockPersonClick: () -> Unit,
     onReportPersonClick: () -> Unit,
     selectedSortType: SortType,
-    navController: NavController = rememberNavController(),
+    navController: NavControllerWrapper,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     var showSortOptions by remember { mutableStateOf(false) }
@@ -214,14 +216,7 @@ fun PersonProfileHeader(
                 selectedSortType = selectedSortType,
             )
         },
-        navigationIcon = {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.person_profile_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
         actions = {
             IconButton(onClick = {
                 showSortOptions = !showSortOptions

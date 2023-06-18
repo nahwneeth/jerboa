@@ -16,7 +16,7 @@ import com.jerboa.ui.components.home.SiteViewModel
 @Composable
 fun SiteSidebarActivity(
     siteViewModel: SiteViewModel,
-    navController: NavController,
+    navController: SiteSideBarNavController,
 ) {
     Log.d("jerboa", "got to site sidebar activity")
 

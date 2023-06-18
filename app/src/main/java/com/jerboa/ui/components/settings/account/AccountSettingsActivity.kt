@@ -15,11 +15,12 @@ import com.jerboa.db.AccountViewModel
 import com.jerboa.ui.components.common.SimpleTopAppBar
 import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.home.SiteViewModel
+import com.jerboa.ui.components.settings.AccountSettingsNavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountSettingsActivity(
-    navController: NavController,
+    navController: AccountSettingsNavController,
     accountSettingsViewModel: AccountSettingsViewModel,
     accountViewModel: AccountViewModel,
     siteViewModel: SiteViewModel,

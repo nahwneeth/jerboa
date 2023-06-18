@@ -39,9 +39,15 @@ import com.jerboa.R
 import com.jerboa.datatypes.sampleCommunity
 import com.jerboa.datatypes.types.Community
 import com.jerboa.db.Account
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.nav.dependencyContainer
 import com.jerboa.ui.components.common.CircularIcon
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.MarkdownTextField
 import com.jerboa.ui.components.common.PickImage
+import com.jerboa.ui.components.community.list.CommunityListDependencies
+import com.jerboa.ui.components.community.list.ToCommunityList
+import com.jerboa.ui.components.post.ToPost
 import com.jerboa.ui.theme.ICON_SIZE
 import com.jerboa.ui.theme.MEDIUM_PADDING
 import com.jerboa.ui.theme.THUMBNAIL_SIZE
@@ -52,7 +58,7 @@ import com.jerboa.validateUrl
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreatePostHeader(
-    navController: NavController = rememberNavController(),
+    navController: NavControllerWrapper,
     onCreatePostClick: () -> Unit,
     formValid: Boolean,
     loading: Boolean,
@@ -82,19 +88,7 @@ fun CreatePostHeader(
                 }
             }
         },
-        navigationIcon = {
-            IconButton(
-                onClick = {
-                    navController.popBackStack()
-                },
-            ) {
-                // Todo add are you sure cancel dialog
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = stringResource(R.string.create_post_close),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
     )
 }
 
@@ -109,7 +103,8 @@ fun CreatePostBody(
     onPickedImage: (image: Uri) -> Unit,
     image: Uri? = null,
     community: Community? = null,
-    navController: NavController = rememberNavController(),
+    navController: CreatePostNavController,
+    onCommunityPicked: (Community) -> Unit,
     formValid: (valid: Boolean) -> Unit,
     account: Account?,
     padding: PaddingValues,
@@ -228,7 +223,11 @@ fun CreatePostBody(
                     .height(60.dp)
                     .fillMaxWidth()
                     .clickable {
-                        navController.navigate("communityList?select=true")
+                        navController.toCommunityList.navigate(
+                            CommunityListDependencies(
+                                onSelectCommunity = onCommunityPicked
+                            )
+                        )
                     },
             )
         }
@@ -252,6 +251,12 @@ fun CreatePostBodyPreview() {
         padding = PaddingValues(),
         suggestedTitle = null,
         suggestedTitleLoading = false,
+        onCommunityPicked = {},
+        navController = CreatePostNavController(
+            rememberNavController(),
+            toPost = ToPost { },
+            toCommunityList = ToCommunityList(dependencyContainer()) { }
+        )
     )
 }
 
@@ -271,5 +276,11 @@ fun CreatePostBodyPreviewNoCommunity() {
         suggestedTitleLoading = false,
         account = null,
         padding = PaddingValues(),
+        onCommunityPicked = {},
+        navController = CreatePostNavController(
+            rememberNavController(),
+            toPost = ToPost { },
+            toCommunityList = ToCommunityList(dependencyContainer()) { }
+        )
     )
 }

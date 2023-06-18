@@ -73,6 +73,8 @@ import com.jerboa.datatypes.types.SortType
 import com.jerboa.datatypes.types.Tagline
 import com.jerboa.db.Account
 import com.jerboa.db.AccountViewModel
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.nav.dependencyContainer
 import com.jerboa.ui.components.common.IconAndTextDrawerItem
 import com.jerboa.ui.components.common.LargerCircularIcon
 import com.jerboa.ui.components.common.ListingTypeOptionsDialog
@@ -83,7 +85,14 @@ import com.jerboa.ui.components.common.SortOptionsDialog
 import com.jerboa.ui.components.common.SortTopOptionsDialog
 import com.jerboa.ui.components.common.simpleVerticalScrollbar
 import com.jerboa.ui.components.community.CommunityLinkLarger
+import com.jerboa.ui.components.community.ToCommunity
+import com.jerboa.ui.components.community.list.ToCommunityList
+import com.jerboa.ui.components.inbox.ToInbox
+import com.jerboa.ui.components.login.ToLogin
 import com.jerboa.ui.components.person.PersonName
+import com.jerboa.ui.components.person.ToProfile
+import com.jerboa.ui.components.post.edit.ToPostEdit
+import com.jerboa.ui.components.settings.ToSettings
 import com.jerboa.ui.theme.DRAWER_BANNER_SIZE
 import com.jerboa.ui.theme.LARGE_PADDING
 import com.jerboa.ui.theme.SMALL_PADDING
@@ -96,8 +105,8 @@ import kotlinx.coroutines.launch
 fun Drawer(
     siteRes: ApiState<GetSiteResponse>,
     unreadCount: Int,
-    navController: NavController = rememberNavController(),
     accountViewModel: AccountViewModel,
+    onAddAccountClick: () -> Unit,
     onSwitchAccountClick: (account: Account) -> Unit,
     onSignOutClick: () -> Unit,
     onClickListingType: (ListingType) -> Unit,
@@ -131,7 +140,7 @@ fun Drawer(
         unreadCount = unreadCount,
         myUserInfo = myUserInfo,
         showAccountAddMode = showAccountAddMode,
-        navController = navController,
+        onAddAccountClick = onAddAccountClick,
         onSwitchAccountClick = onSwitchAccountClick,
         onSignOutClick = onSignOutClick,
         onClickListingType = onClickListingType,
@@ -147,8 +156,8 @@ fun Drawer(
 @Composable
 fun DrawerContent(
     showAccountAddMode: Boolean,
-    navController: NavController,
     accountViewModel: AccountViewModel,
+    onAddAccountClick: () -> Unit,
     onSwitchAccountClick: (account: Account) -> Unit,
     onSignOutClick: () -> Unit,
     onClickListingType: (ListingType) -> Unit,
@@ -168,7 +177,7 @@ fun DrawerContent(
     ) {
         DrawerAddAccountMode(
             accountViewModel = accountViewModel,
-            navController = navController,
+            onAddAccountClick = onAddAccountClick,
             onSwitchAccountClick = onSwitchAccountClick,
             onSignOutClick = onSignOutClick,
         )
@@ -325,8 +334,8 @@ fun DrawerItemsMainPreview() {
 
 @Composable
 fun DrawerAddAccountMode(
-    navController: NavController = rememberNavController(),
     accountViewModel: AccountViewModel?,
+    onAddAccountClick: () -> Unit,
     onSwitchAccountClick: (account: Account) -> Unit,
     onSignOutClick: () -> Unit,
 ) {
@@ -338,7 +347,7 @@ fun DrawerAddAccountMode(
         IconAndTextDrawerItem(
             text = stringResource(R.string.home_add_account),
             icon = Icons.Outlined.Add,
-            onClick = { navController.navigate(route = "login") },
+            onClick = onAddAccountClick,
         )
         accountsWithoutCurrent?.forEach {
             IconAndTextDrawerItem(
@@ -361,6 +370,7 @@ fun DrawerAddAccountMode(
 @Composable
 fun DrawerAddAccountModePreview() {
     DrawerAddAccountMode(
+        onAddAccountClick = {},
         onSignOutClick = {},
         onSwitchAccountClick = {},
         accountViewModel = null,
@@ -465,10 +475,10 @@ fun HomeHeader(
     onClickListingType: (ListingType) -> Unit,
     onClickRefresh: () -> Unit,
     onClickPostViewMode: (PostViewMode) -> Unit,
+    onClickShowSiteInfo: () -> Unit,
     selectedSortType: SortType,
     selectedListingType: ListingType,
     selectedPostViewMode: PostViewMode,
-    navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     var showSortOptions by remember { mutableStateOf(false) }
@@ -522,7 +532,7 @@ fun HomeHeader(
                 showMoreOptions = false
                 showPostViewModeOptions = !showPostViewModeOptions
             },
-            navController = navController,
+            onClickShowSiteInfo = onClickShowSiteInfo,
         )
     }
 
@@ -599,10 +609,10 @@ fun HomeHeaderPreview() {
         onClickListingType = {},
         onClickRefresh = {},
         onClickPostViewMode = {},
+        onClickShowSiteInfo = {},
         selectedSortType = SortType.Hot,
         selectedListingType = ListingType.All,
         selectedPostViewMode = PostViewMode.Card,
-        navController = rememberNavController(),
         scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(),
     )
 }
@@ -610,9 +620,9 @@ fun HomeHeaderPreview() {
 @Composable
 fun HomeMoreDialog(
     onDismissRequest: () -> Unit,
-    navController: NavController,
     onClickRefresh: () -> Unit,
     onClickShowPostViewModeDialog: () -> Unit,
+    onClickShowSiteInfo: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -638,7 +648,7 @@ fun HomeMoreDialog(
                     text = stringResource(R.string.home_site_info),
                     icon = Icons.Outlined.Info,
                     onClick = {
-                        navController.navigate("siteSidebar")
+                        onClickShowSiteInfo()
                         onDismissRequest()
                     },
                 )

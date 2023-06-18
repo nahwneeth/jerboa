@@ -2,6 +2,8 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'com.google.devtools.ksp'
+    id 'kotlin-kapt'
+    id 'com.google.dagger.hilt.android'
 }
 
 android {
@@ -90,6 +92,12 @@ dependencies {
     implementation 'androidx.compose.runtime:runtime-livedata:1.4.3'
     implementation "androidx.lifecycle:lifecycle-runtime-compose:2.6.1"
 
+    // Dependency Injection
+    implementation "com.google.dagger:hilt-android:2.44"
+    kapt "com.google.dagger:hilt-compiler:2.44"
+    implementation 'androidx.hilt:hilt-navigation-compose:1.0.0'
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.6.1"
+
     // gif support
     implementation "io.coil-kt:coil-gif:2.4.0"
 
@@ -133,4 +141,9 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-test-manifest:1.4.3'
     implementation "net.engawapg.lib:zoomable:1.4.3"
     implementation 'androidx.browser:browser:1.5.0'
+}
+
+// Allow references to generated code
+kapt {
+    correctErrorTypes true
 }

@@ -36,6 +36,8 @@ import com.jerboa.R
 import com.jerboa.datatypes.types.Login
 import com.jerboa.db.Account
 import com.jerboa.onAutofill
+import com.jerboa.ui.components.common.DefaultBackButton
+import com.jerboa.ui.components.home.ToHome
 
 @Composable
 fun MyTextField(
@@ -204,7 +206,7 @@ fun LoginFormPreview() {
 
 @Composable
 fun LoginHeader(
-    navController: NavController = rememberNavController(),
+    navController: LoginNavController,
     accounts: List<Account>? = null,
 ) {
     TopAppBar(
@@ -213,24 +215,17 @@ fun LoginHeader(
                 text = stringResource(R.string.login_login),
             )
         },
-        navigationIcon = {
-            IconButton(
-                enabled = !accounts.isNullOrEmpty(),
-                onClick = {
-                    navController.popBackStack()
-                },
-            ) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.login_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
     )
 }
 
 @Preview
 @Composable
 fun LoginHeaderPreview() {
-    LoginHeader()
+    LoginHeader(
+        LoginNavController(
+            rememberNavController(),
+            toHome = ToHome { }
+        ),
+    )
 }

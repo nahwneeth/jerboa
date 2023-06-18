@@ -15,11 +15,14 @@ import com.jerboa.datatypes.types.Search
 import com.jerboa.datatypes.types.SearchResponse
 import com.jerboa.datatypes.types.SearchType
 import com.jerboa.datatypes.types.SubscribedType
+import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
 import com.jerboa.ui.components.home.SiteViewModel
 import kotlinx.coroutines.launch
 
-class CommunityListViewModel : ViewModel() {
+class CommunityListViewModel : ViewModel(), Initializable {
+    override var initialized = false
+
     var searchRes: ApiState<SearchResponse> by mutableStateOf(ApiState.Empty)
         private set
 

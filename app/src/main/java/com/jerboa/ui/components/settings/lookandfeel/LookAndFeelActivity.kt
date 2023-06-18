@@ -32,12 +32,14 @@ import com.jerboa.ThemeMode
 import com.jerboa.db.AppSettings
 import com.jerboa.db.AppSettingsViewModel
 import com.jerboa.db.DEFAULT_FONT_SIZE
+import com.jerboa.nav.NavControllerWrapper
 import com.jerboa.ui.components.common.SimpleTopAppBar
+import com.jerboa.ui.components.settings.LookAndFeelNavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LookAndFeelActivity(
-    navController: NavController,
+    navController: LookAndFeelNavController,
     appSettingsViewModel: AppSettingsViewModel,
 ) {
     Log.d("jerboa", "Got to lookAndFeel activity")
@@ -88,7 +90,10 @@ fun LookAndFeelActivity(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            SimpleTopAppBar(text = stringResource(R.string.look_and_feel_look_and_feel), navController = navController)
+            SimpleTopAppBar(
+                text = stringResource(R.string.look_and_feel_look_and_feel),
+                navController = navController
+            )
         },
         content = { padding ->
             Column(

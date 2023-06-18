@@ -32,12 +32,14 @@ import com.jerboa.findAndUpdateCommentReply
 import com.jerboa.findAndUpdateMention
 import com.jerboa.findAndUpdatePersonMention
 import com.jerboa.findAndUpdatePrivateMessage
+import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
 import com.jerboa.showBlockCommunityToast
 import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
-class InboxViewModel : ViewModel() {
+class InboxViewModel : ViewModel(), Initializable {
+    override var initialized = false
 
     var repliesRes: ApiState<GetRepliesResponse> by mutableStateOf(
         ApiState.Empty,

@@ -14,9 +14,11 @@ import com.jerboa.datatypes.types.CreatePrivateMessage
 import com.jerboa.datatypes.types.PrivateMessageResponse
 import com.jerboa.datatypes.types.PrivateMessageView
 import com.jerboa.db.Account
+import com.jerboa.nav.Initializable
 import kotlinx.coroutines.launch
 
-class PrivateMessageReplyViewModel : ViewModel() {
+class PrivateMessageReplyViewModel : ViewModel(), Initializable {
+    override var initialized = false
 
     var createMessageRes: ApiState<PrivateMessageResponse> by mutableStateOf(ApiState.Empty)
         private set
@@ -27,13 +29,13 @@ class PrivateMessageReplyViewModel : ViewModel() {
         newReplyItem: PrivateMessageView,
     ) {
         replyItem = newReplyItem
+        initialized = true
     }
 
     fun createPrivateMessage(
         content: String,
         account: Account,
-        navController: NavController,
-        focusManager: FocusManager,
+        onFinish: () -> Unit,
     ) {
         viewModelScope.launch {
             val form = CreatePrivateMessage(
@@ -45,8 +47,9 @@ class PrivateMessageReplyViewModel : ViewModel() {
             createMessageRes = ApiState.Loading
             createMessageRes = apiWrapper(API.getInstance().createPrivateMessage(form))
 
-            focusManager.clearFocus()
-            navController.navigateUp()
+//            focusManager.clearFocus()
+//            navController.navigateUp()
+            onFinish()
         }
     }
 }

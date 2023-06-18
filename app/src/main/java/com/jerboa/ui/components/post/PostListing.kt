@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.accompanist.flowlayout.FlowCrossAxisAlignment
 import com.google.accompanist.flowlayout.FlowMainAxisAlignment
@@ -75,6 +76,7 @@ import com.jerboa.db.Account
 import com.jerboa.hostName
 import com.jerboa.isImage
 import com.jerboa.isSameInstance
+import com.jerboa.nav.NavControllerWrapper
 import com.jerboa.nsfwCheck
 import com.jerboa.ui.components.common.ActionBarButton
 import com.jerboa.ui.components.common.CircularIcon
@@ -1251,7 +1253,9 @@ fun PostListingCard(
 @Composable
 fun PostListingHeaderPreview() {
     val navController = rememberNavController()
-    SimpleTopAppBar("Post", navController)
+    SimpleTopAppBar("Post", object: NavControllerWrapper() {
+        override val navController = rememberNavController()
+    })
 }
 
 @Composable

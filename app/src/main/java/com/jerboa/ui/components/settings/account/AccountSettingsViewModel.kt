@@ -15,9 +15,12 @@ import com.jerboa.datatypes.types.SaveUserSettings
 import com.jerboa.db.Account
 import com.jerboa.db.AccountRepository
 import com.jerboa.ui.components.home.SiteViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class AccountSettingsViewModel(
+@HiltViewModel
+class AccountSettingsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
 ) : ViewModel() {
 

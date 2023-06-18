@@ -23,17 +23,24 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import arrow.core.Either
 import com.jerboa.PostViewMode
 import com.jerboa.R
 import com.jerboa.VoteType
@@ -41,30 +48,45 @@ import com.jerboa.api.ApiState
 import com.jerboa.buildCommentsTree
 import com.jerboa.datatypes.types.BlockCommunity
 import com.jerboa.datatypes.types.BlockPerson
+import com.jerboa.datatypes.types.CommentId
 import com.jerboa.datatypes.types.CommentSortType
 import com.jerboa.datatypes.types.CreateCommentLike
 import com.jerboa.datatypes.types.CreatePostLike
 import com.jerboa.datatypes.types.DeleteComment
 import com.jerboa.datatypes.types.DeletePost
+import com.jerboa.datatypes.types.PostId
 import com.jerboa.datatypes.types.SaveComment
 import com.jerboa.datatypes.types.SavePost
+import com.jerboa.datatypes.types.SortType
 import com.jerboa.db.AccountViewModel
+import com.jerboa.db.AppSettings
+import com.jerboa.db.AppSettingsViewModel
 import com.jerboa.getCommentParentId
 import com.jerboa.getDepthFromComment
 import com.jerboa.isModerator
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.nav.initializeOnce
 import com.jerboa.newVote
 import com.jerboa.ui.components.comment.ShowCommentContextButtons
 import com.jerboa.ui.components.comment.commentNodeItems
-import com.jerboa.ui.components.comment.edit.CommentEditViewModel
+import com.jerboa.ui.components.comment.edit.CommentEditDependencies
+import com.jerboa.ui.components.comment.edit.ToCommentEdit
+import com.jerboa.ui.components.comment.reply.CommentReplyDependencies
 import com.jerboa.ui.components.comment.reply.CommentReplyViewModel
 import com.jerboa.ui.components.comment.reply.ReplyItem
+import com.jerboa.ui.components.comment.reply.ToCommentReply
 import com.jerboa.ui.components.common.ApiErrorText
 import com.jerboa.ui.components.common.CommentSortOptionsDialog
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.LoadingBar
 import com.jerboa.ui.components.common.getCurrentAccount
+import com.jerboa.ui.components.common.getCurrentAccountSync
 import com.jerboa.ui.components.common.simpleVerticalScrollbar
 import com.jerboa.ui.components.home.SiteViewModel
+import com.jerboa.ui.components.post.edit.PostEditDependencies
 import com.jerboa.ui.components.post.edit.PostEditViewModel
+import kotlinx.coroutines.delay
+import kotlin.concurrent.timer
 
 @Composable
 fun CommentsHeaderTitle(
@@ -85,24 +107,38 @@ fun CommentsHeaderTitle(
 @OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PostActivity(
-    postViewModel: PostViewModel,
+    postArg: Either<PostId, CommentId>,
     siteViewModel: SiteViewModel,
     accountViewModel: AccountViewModel,
-    commentEditViewModel: CommentEditViewModel,
-    commentReplyViewModel: CommentReplyViewModel,
-    postEditViewModel: PostEditViewModel,
-    navController: NavController,
-    showCollapsedCommentContent: Boolean,
-    showActionBarByDefault: Boolean,
-    showVotingArrowsInListView: Boolean,
-    onClickSortType: (CommentSortType) -> Unit,
-    selectedSortType: CommentSortType,
+    navController: PostNavController,
+    appSettingsViewModel: AppSettingsViewModel,
 ) {
     Log.d("jerboa", "got to post activity")
 
     val ctx = LocalContext.current
 
+    val scope = rememberCoroutineScope()
+
     val account = getCurrentAccount(accountViewModel = accountViewModel)
+    Log.d("understand recompose", "account: ${account?.name ?: "null"}")
+
+    val appSettings by appSettingsViewModel.appSettings.observeAsState()
+    val showCollapsedCommentContent = appSettings?.showCollapsedCommentContent ?: false
+    val showActionBarByDefault = appSettings?.showCommentActionBarByDefault ?: true
+    val showVotingArrowsInListView = appSettings?.showVotingArrowsInListView ?: true
+
+    val postViewModel: PostViewModel = hiltViewModel()
+    LaunchedEffect(postArg) {
+        postViewModel.initialize(id = postArg)
+        delay(10000)
+        accountViewModel.removeCurrent()
+    }
+    val selectedSortType = postViewModel.sortType
+
+    val onClickSortType = { commentSortType: CommentSortType ->
+        postViewModel.updateSortType(commentSortType)
+        postViewModel.getData(account)
+    }
 
     val postLoading = postViewModel.postRes == ApiState.Loading
 
@@ -142,14 +178,7 @@ fun PostActivity(
                             selectedSortType = selectedSortType,
                         )
                     },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                Icons.Outlined.ArrowBack,
-                                contentDescription = stringResource(R.string.topAppBar_back),
-                            )
-                        }
-                    },
+                    navigationIcon = { DefaultBackButton(navController) },
                     actions = {
                         IconButton(onClick = {
                             showSortOptions = !showSortOptions
@@ -218,8 +247,16 @@ fun PostActivity(
                                         }
                                     },
                                     onReplyClick = { pv ->
-                                        commentReplyViewModel.initialize(ReplyItem.PostItem(pv))
-                                        navController.navigate("commentReply")
+                                        navController.toCommentReply.navigate(
+                                            CommentReplyDependencies(
+                                                ReplyItem.PostItem(pv),
+                                                isModerator = isModerator(
+                                                    pv.creator,
+                                                    postRes.data.moderators,
+                                                ),
+                                                onCommentReply = postViewModel::appendComment,
+                                            ),
+                                        )
                                     },
                                     onPostClick = {},
                                     onSaveClick = { pv ->
@@ -234,11 +271,15 @@ fun PostActivity(
                                         }
                                     },
                                     onCommunityClick = { community ->
-                                        navController.navigate(route = "community/${community.id}")
+                                        navController.toCommunity.navigate(community.id)
                                     },
                                     onEditPostClick = { pv ->
-                                        postEditViewModel.initialize(pv)
-                                        navController.navigate("postEdit")
+                                        navController.toPostEdit.navigate(
+                                            PostEditDependencies(
+                                                postView = pv,
+                                                onPostEdit = postViewModel::updatePost
+                                            )
+                                        )
                                     },
                                     onDeletePostClick = { pv ->
                                         account?.also { acct ->
@@ -252,10 +293,10 @@ fun PostActivity(
                                         }
                                     },
                                     onReportClick = { pv ->
-                                        navController.navigate("postReport/${pv.post.id}")
+                                        navController.toPostReport.navigate(pv.post.id)
                                     },
                                     onPersonClick = { personId ->
-                                        navController.navigate(route = "profile/$personId")
+                                        navController.toProfile.navigate(personId)
                                     },
                                     onBlockCommunityClick = { c ->
                                         account?.also { acct ->
@@ -327,10 +368,10 @@ fun PostActivity(
                                                 commentParentId = commentParentId,
                                                 showContextButton = showContextButton,
                                                 onPostClick = { id ->
-                                                    navController.navigate("post/$id")
+                                                    navController.toPost.navigate(id)
                                                 },
                                                 onCommentClick = { commentId ->
-                                                    navController.navigate("comment/$commentId")
+                                                    navController.toComment.navigate(commentId)
                                                 },
                                             )
                                         }
@@ -388,12 +429,16 @@ fun PostActivity(
                                             }
                                         },
                                         onReplyClick = { cv ->
-                                            commentReplyViewModel.initialize(
-                                                ReplyItem.CommentItem(
-                                                    cv,
+                                            navController.toCommentReply.navigate(
+                                                CommentReplyDependencies(
+                                                    ReplyItem.CommentItem(cv),
+                                                    isModerator = isModerator(
+                                                        cv.creator,
+                                                        postRes.data.moderators,
+                                                    ),
+                                                    onCommentReply = postViewModel::appendComment,
                                                 ),
                                             )
-                                            navController.navigate("commentReply")
                                         },
                                         onSaveClick = { cv ->
                                             account?.also { acct ->
@@ -407,11 +452,15 @@ fun PostActivity(
                                             }
                                         },
                                         onPersonClick = { personId ->
-                                            navController.navigate(route = "profile/$personId")
+                                            navController.toProfile.navigate(personId)
                                         },
                                         onEditCommentClick = { cv ->
-                                            commentEditViewModel.initialize(cv)
-                                            navController.navigate("commentEdit")
+                                            navController.toCommentEdit.navigate(
+                                                CommentEditDependencies(
+                                                    commentView = cv,
+                                                    onCommentEdit = postViewModel::updateComment,
+                                                )
+                                            )
                                         },
                                         onDeleteCommentClick = { cv ->
                                             account?.also { acct ->
@@ -425,15 +474,10 @@ fun PostActivity(
                                             }
                                         },
                                         onReportClick = { cv ->
-                                            navController.navigate(
-                                                "commentReport/${
-                                                    cv.comment
-                                                        .id
-                                                }",
-                                            )
+                                            navController.toCommentReport.navigate(cv.comment.id)
                                         },
                                         onCommentLinkClick = { cv ->
-                                            navController.navigate("comment/${cv.comment.id}")
+                                            navController.toComment.navigate(cv.comment.id)
                                         },
                                         onFetchChildrenClick = { cv ->
                                             postViewModel.fetchMoreChildren(
@@ -455,7 +499,7 @@ fun PostActivity(
                                             }
                                         },
                                         onCommunityClick = { community ->
-                                            navController.navigate(route = "community/${community.id}")
+                                            navController.toCommunity.navigate(community.id)
                                         },
                                         onPostClick = {}, // Do nothing
                                         account = account,

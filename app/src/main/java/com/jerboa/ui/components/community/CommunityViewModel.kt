@@ -28,12 +28,15 @@ import com.jerboa.datatypes.types.SavePost
 import com.jerboa.datatypes.types.SortType
 import com.jerboa.dedupePosts
 import com.jerboa.findAndUpdatePost
+import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
 import com.jerboa.showBlockCommunityToast
 import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
-class CommunityViewModel : ViewModel() {
+class CommunityViewModel : ViewModel(), Initializable {
+    override var initialized: Boolean = false
+
     var communityRes: ApiState<GetCommunityResponse> by mutableStateOf(ApiState.Empty)
         private set
 

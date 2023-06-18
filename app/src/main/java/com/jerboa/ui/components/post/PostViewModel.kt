@@ -1,10 +1,17 @@
 package com.jerboa.ui.components.post
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
+import androidx.lifecycle.distinctUntilChanged
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
 import com.jerboa.api.API
@@ -35,14 +42,25 @@ import com.jerboa.datatypes.types.SaveComment
 import com.jerboa.datatypes.types.SavePost
 import com.jerboa.db.Account
 import com.jerboa.findAndUpdateComment
+import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
 import com.jerboa.showBlockCommunityToast
 import com.jerboa.showBlockPersonToast
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.observeOn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 const val COMMENTS_DEPTH_MAX = 6
 
-class PostViewModel : ViewModel() {
+@HiltViewModel
+class PostViewModel @Inject constructor(
+    private val account: LiveData<Account?>,
+) : ViewModel(), Initializable  {
+    override var initialized = false
 
     var postRes: ApiState<GetPostResponse> by mutableStateOf(ApiState.Empty)
         private set
@@ -53,6 +71,9 @@ class PostViewModel : ViewModel() {
     // If this is set, its a comment type view
     var id by mutableStateOf<Either<PostId, CommentId>?>(null)
         private set
+
+    private val _id = MutableLiveData<Either<PostId, CommentId>?>(null)
+
     var sortType by mutableStateOf(CommentSortType.Hot)
         private set
 
@@ -69,54 +90,70 @@ class PostViewModel : ViewModel() {
         mutableStateOf(ApiState.Empty)
     private var blockPersonRes: ApiState<BlockPersonResponse> by mutableStateOf(ApiState.Empty)
 
+    init {
+        Log.d("Flow Combine", "Init method of PostViewModel")
+        viewModelScope.launch {
+            combine(account.asFlow(), _id.distinctUntilChanged().asFlow()) { account, id ->
+                Log.d("Flow Combine", "name = ${account?.name}")
+                Log.d("Flow Combine", "id = $id")
+                getData(account, id)
+            }.collect()
+        }
+    }
+
     fun initialize(
         id: Either<PostId, CommentId>,
     ) {
         this.id = id
+        this._id.value = id
     }
 
     fun updateSortType(sortType: CommentSortType) {
         this.sortType = sortType
     }
 
-    fun getData(
-        account: Account?,
-    ) {
+    fun getData(account: Account?) {
         viewModelScope.launch {
-            // Set the commentId for the right case
-            id?.also { id ->
+            getData(account, id)
+        }
+    }
 
-                val postForm = id.fold({
-                    GetPost(id = it, auth = account?.jwt)
-                }, {
-                    GetPost(comment_id = it, auth = account?.jwt)
-                })
+    private suspend fun getData(
+        account: Account?,
+        itemId: Either<PostId, CommentId>?,
+    ) {
+        // Set the commentId for the right case
+        itemId?.also { id ->
+            val postForm = id.fold({
+                GetPost(id = it, auth = account?.jwt)
+            }, {
+                GetPost(comment_id = it, auth = account?.jwt)
+            })
 
-                postRes = ApiState.Loading
-                postRes = apiWrapper(API.getInstance().getPost(postForm.serializeToMap()))
+            postRes = ApiState.Loading
+            postRes = apiWrapper(API.getInstance().getPost(postForm.serializeToMap()))
 
-                val commentsForm = id.fold({
-                    GetComments(
-                        max_depth = COMMENTS_DEPTH_MAX,
-                        type_ = ListingType.All,
-                        post_id = it,
-                        auth = account?.jwt,
-                        sort = sortType,
-                    )
-                }, {
-                    GetComments(
-                        max_depth = COMMENTS_DEPTH_MAX,
-                        type_ = ListingType.All,
-                        parent_id = it,
-                        auth = account?.jwt,
-                        sort = sortType,
-                    )
-                })
+            val commentsForm = id.fold({
+                GetComments(
+                    max_depth = COMMENTS_DEPTH_MAX,
+                    type_ = ListingType.All,
+                    post_id = it,
+                    auth = account?.jwt,
+                    sort = sortType,
+                )
+            }, {
+                GetComments(
+                    max_depth = COMMENTS_DEPTH_MAX,
+                    type_ = ListingType.All,
+                    parent_id = it,
+                    auth = account?.jwt,
+                    sort = sortType,
+                )
+            })
 
-                commentsRes = ApiState.Loading
-                commentsRes =
-                    apiWrapper(API.getInstance().getComments(commentsForm.serializeToMap()))
-            }
+            commentsRes = ApiState.Loading
+            commentsRes =
+                apiWrapper(API.getInstance().getComments(commentsForm.serializeToMap()))
         }
     }
 

@@ -46,6 +46,7 @@ import com.jerboa.datatypes.samplePost
 import com.jerboa.datatypes.types.Person
 import com.jerboa.db.Account
 import com.jerboa.loginFirstToast
+import com.jerboa.nav.NavControllerWrapper
 import com.jerboa.siFormat
 import com.jerboa.ui.components.person.PersonProfileLink
 import com.jerboa.ui.theme.*
@@ -54,7 +55,7 @@ import com.jerboa.ui.theme.*
 @Composable
 fun SimpleTopAppBar(
     text: String,
-    navController: NavController,
+    navController: NavControllerWrapper,
     scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
     TopAppBar(
@@ -64,14 +65,7 @@ fun SimpleTopAppBar(
                 text = text,
             )
         },
-        navigationIcon = {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.topAppBar_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
     )
 }
 
@@ -585,5 +579,7 @@ fun Modifier.simpleVerticalScrollbar(
 fun LoadingBar(
     padding: PaddingValues = PaddingValues(0.dp),
 ) {
-    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(padding))
+    LinearProgressIndicator(modifier = Modifier
+        .fillMaxWidth()
+        .padding(padding))
 }

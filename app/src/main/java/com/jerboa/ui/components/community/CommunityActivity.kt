@@ -20,6 +20,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -27,21 +30,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavController
+import arrow.core.Either
+import arrow.core.getOrElse
 import com.jerboa.R
 import com.jerboa.VoteType
 import com.jerboa.api.ApiState
 import com.jerboa.datatypes.types.BlockCommunity
 import com.jerboa.datatypes.types.BlockPerson
+import com.jerboa.datatypes.types.CommunityId
 import com.jerboa.datatypes.types.CreatePostLike
 import com.jerboa.datatypes.types.DeletePost
 import com.jerboa.datatypes.types.FollowCommunity
+import com.jerboa.datatypes.types.GetCommunity
 import com.jerboa.datatypes.types.GetPosts
 import com.jerboa.datatypes.types.SavePost
 import com.jerboa.datatypes.types.SubscribedType
 import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
 import com.jerboa.loginFirstToast
+import com.jerboa.nav.initializeOnce
 import com.jerboa.newVote
 import com.jerboa.scrollToTop
 import com.jerboa.ui.components.common.ApiEmptyText
@@ -50,22 +57,20 @@ import com.jerboa.ui.components.common.BottomAppBarAll
 import com.jerboa.ui.components.common.LoadingBar
 import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.common.getPostViewMode
-import com.jerboa.ui.components.community.list.CommunityListViewModel
 import com.jerboa.ui.components.home.SiteViewModel
 import com.jerboa.ui.components.post.PostListings
-import com.jerboa.ui.components.post.edit.PostEditViewModel
+import com.jerboa.ui.components.post.create.CreatePostDependencies
+import com.jerboa.ui.components.post.edit.PostEditDependencies
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun CommunityActivity(
-    navController: NavController,
+    communityArg: Either<Int, String>,
+    navController: CommunityNavController,
     communityViewModel: CommunityViewModel,
-    communityListViewModel: CommunityListViewModel,
     siteViewModel: SiteViewModel,
-    postEditViewModel: PostEditViewModel,
     accountViewModel: AccountViewModel,
     appSettingsViewModel: AppSettingsViewModel,
-    showVotingArrowsInListView: Boolean,
 ) {
     Log.d("jerboa", "got to community activity")
 
@@ -75,6 +80,31 @@ fun CommunityActivity(
     val ctx = LocalContext.current
     val account = getCurrentAccount(accountViewModel)
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+    val appSettings by appSettingsViewModel.appSettings.observeAsState()
+    val showVotingArrowsInListView = appSettings?.showVotingArrowsInListView ?: true
+
+    LaunchedEffect(Unit) {
+        initializeOnce(communityViewModel) {
+            val communityId = communityArg.fold({ it }, { null })
+            val communityName = communityArg.fold({ null }, { it })
+            getCommunity(
+                form = GetCommunity(
+                    id = communityId,
+                    name = communityName,
+                    auth = account?.jwt
+                )
+            )
+            getPosts(
+                form = GetPosts(
+                    community_id = communityId,
+                    community_name = communityName,
+                    page = communityViewModel.page,
+                    sort = communityViewModel.sortType,
+                    auth = account?.jwt,
+                ),
+            )
+        }
+    }
 
     val loading = communityViewModel.postsRes == ApiState.Loading || communityViewModel.fetchingMore
 
@@ -224,7 +254,7 @@ fun CommunityActivity(
                                 }
                             },
                             onPostClick = { postView ->
-                                navController.navigate(route = "post/${postView.post.id}")
+                                navController.toPost.navigate(postView.post.id)
                             },
                             onSaveClick = { postView ->
                                 account?.also { acct ->
@@ -238,8 +268,12 @@ fun CommunityActivity(
                                 }
                             },
                             onEditPostClick = { postView ->
-                                postEditViewModel.initialize(postView)
-                                navController.navigate("postEdit")
+                                navController.toPostEdit.navigate(
+                                    PostEditDependencies(
+                                        postView = postView,
+                                        onPostEdit = communityViewModel::updatePost
+                                    )
+                                )
                             },
                             onDeletePostClick = { postView ->
                                 account?.also { acct ->
@@ -253,13 +287,13 @@ fun CommunityActivity(
                                 }
                             },
                             onReportClick = { postView ->
-                                navController.navigate("postReport/${postView.post.id}")
+                                navController.toPostReport.navigate(postView.post.id)
                             },
                             onCommunityClick = { community ->
-                                navController.navigate(route = "community/${community.id}")
+                                navController.toCommunity.navigate(community.id)
                             },
                             onPersonClick = { personId ->
-                                navController.navigate(route = "profile/$personId")
+                                navController.toProfile.navigate(personId)
                             },
                             onBlockCommunityClick = {
                                 when (val communityRes = communityViewModel.communityRes) {
@@ -319,6 +353,7 @@ fun CommunityActivity(
                             showVotingArrowsInListView = showVotingArrowsInListView,
                         )
                     }
+
                     else -> {}
                 }
             }
@@ -330,8 +365,9 @@ fun CommunityActivity(
                     FloatingActionButton(
                         onClick = {
                             account?.also {
-                                communityListViewModel.selectCommunity(communityRes.data.community_view.community)
-                                navController.navigate("createPost")
+                                navController.toCreatePost.navigate(
+                                    CreatePostDependencies(communityRes.data.community_view.community)
+                                )
                             }
                         },
                     ) {
@@ -344,35 +380,6 @@ fun CommunityActivity(
 
                 else -> {}
             }
-        },
-        bottomBar = {
-            BottomAppBarAll(
-                showBottomNav = appSettingsViewModel.appSettings.value?.showBottomNav,
-                screen = "communityList",
-                unreadCount = siteViewModel.getUnreadCountTotal(),
-                onClickProfile = {
-                    account?.id?.also {
-                        navController.navigate(route = "profile/$it")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                onClickInbox = {
-                    account?.also {
-                        navController.navigate(route = "inbox")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                onClickSaved = {
-                    account?.id?.also {
-                        navController.navigate(route = "profile/$it?saved=${true}")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                navController = navController,
-            )
         },
     )
 }

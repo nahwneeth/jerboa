@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.jerboa.*
 import com.jerboa.api.ApiState
@@ -37,9 +38,13 @@ import com.jerboa.datatypes.types.SaveComment
 import com.jerboa.db.Account
 import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.nav.initializeOnce
 import com.jerboa.ui.components.comment.mentionnode.CommentMentionNode
+import com.jerboa.ui.components.comment.reply.CommentReplyDependencies
 import com.jerboa.ui.components.comment.reply.CommentReplyViewModel
 import com.jerboa.ui.components.comment.reply.ReplyItem
+import com.jerboa.ui.components.comment.reply.ToCommentReply
 import com.jerboa.ui.components.comment.replynode.CommentReplyNode
 import com.jerboa.ui.components.common.ApiEmptyText
 import com.jerboa.ui.components.common.ApiErrorText
@@ -49,6 +54,7 @@ import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.common.simpleVerticalScrollbar
 import com.jerboa.ui.components.home.SiteViewModel
 import com.jerboa.ui.components.privatemessage.PrivateMessage
+import com.jerboa.ui.components.privatemessage.PrivateMessageReplyDependencies
 import com.jerboa.ui.components.privatemessage.PrivateMessageReplyViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -56,13 +62,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxActivity(
-    navController: NavController,
-    appSettingsViewModel: AppSettingsViewModel,
-    inboxViewModel: InboxViewModel,
+    navController: InboxNavController,
     siteViewModel: SiteViewModel,
     accountViewModel: AccountViewModel,
-    commentReplyViewModel: CommentReplyViewModel,
-    privateMessageReplyViewModel: PrivateMessageReplyViewModel,
 ) {
     Log.d("jerboa", "got to inbox activity")
 
@@ -70,8 +72,35 @@ fun InboxActivity(
     val snackbarHostState = remember { SnackbarHostState() }
     val ctx = LocalContext.current
     val account = getCurrentAccount(accountViewModel)
+    Log.d("understand recompose", "account: ${account?.name ?: "null"}")
+
     val unreadCount = siteViewModel.getUnreadCountTotal()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+
+    val inboxViewModel: InboxViewModel = viewModel()
+    Log.d("understand recompose", "initialized = ${inboxViewModel.initialized}")
+    LaunchedEffect(Unit) {
+        Log.d("understand recompose", "LaunchedEffect")
+        initializeOnce(inboxViewModel) {
+            Log.d("understand recompose", "initializeOnce")
+            inboxViewModel.resetPage()
+            inboxViewModel.getReplies(
+                GetReplies(
+                    auth = account!!.jwt,
+                ),
+            )
+            inboxViewModel.getMentions(
+                GetPersonMentions(
+                    auth = account.jwt,
+                ),
+            )
+            inboxViewModel.getMessages(
+                GetPrivateMessages(
+                    auth = account.jwt,
+                ),
+            )
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -133,40 +162,11 @@ fun InboxActivity(
             InboxTabs(
                 padding = it,
                 navController = navController,
-                commentReplyViewModel = commentReplyViewModel,
                 inboxViewModel = inboxViewModel,
                 siteViewModel = siteViewModel,
-                privateMessageReplyViewModel = privateMessageReplyViewModel,
                 ctx = ctx,
                 account = account,
                 scope = scope,
-            )
-        },
-        bottomBar = {
-            BottomAppBarAll(
-                showBottomNav = appSettingsViewModel.appSettings.value?.showBottomNav,
-                screen = "inbox",
-                unreadCount = siteViewModel.getUnreadCountTotal(),
-                onClickProfile = {
-                    account?.id?.also {
-                        navController.navigate(route = "profile/$it")
-                    }
-                },
-                onClickInbox = {
-                    account?.also {
-                        navController.navigate(route = "inbox")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                onClickSaved = {
-                    account?.id?.also {
-                        navController.navigate(route = "profile/$it?saved=${true}")
-                    } ?: run {
-                        loginFirstToast(ctx)
-                    }
-                },
-                navController = navController,
             )
         },
     )
@@ -181,11 +181,9 @@ enum class InboxTab {
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun InboxTabs(
-    navController: NavController,
+    navController: InboxNavController,
     inboxViewModel: InboxViewModel,
     siteViewModel: SiteViewModel,
-    privateMessageReplyViewModel: PrivateMessageReplyViewModel,
-    commentReplyViewModel: CommentReplyViewModel,
     ctx: Context,
     account: Account?,
     scope: CoroutineScope,
@@ -319,11 +317,14 @@ fun InboxTabs(
                                                 }
                                             },
                                             onReplyClick = { cr ->
-                                                commentReplyViewModel.initialize(
-                                                    ReplyItem
-                                                        .CommentReplyItem(cr),
+                                                navController.toCommentReply.navigate(
+                                                    CommentReplyDependencies(
+                                                        ReplyItem.CommentReplyItem(cr),
+                                                        // TODO(nahwneeth), how to know if mod or not
+                                                        isModerator = false,
+                                                        onCommentReply = null,
+                                                    )
                                                 )
-                                                navController.navigate("commentReply")
                                             },
                                             onSaveClick = { cr ->
                                                 account?.also { acct ->
@@ -353,23 +354,22 @@ fun InboxTabs(
                                                 }
                                             },
                                             onReportClick = { cv ->
-                                                navController.navigate("commentReport/${cv.comment.id}")
+                                                navController.toCommentReport.navigate(cv.comment.id)
                                             },
                                             onCommentLinkClick = { cv ->
                                                 // Go to the parent comment or post instead for context
                                                 val parent = getCommentParentId(cv.comment)
                                                 val route = if (parent != null) {
-                                                    "comment/$parent"
+                                                    navController.toComment.navigate(parent)
                                                 } else {
-                                                    "post/${cv.post.id}"
+                                                    navController.toPost.navigate(cv.post.id)
                                                 }
-                                                navController.navigate(route)
                                             },
                                             onPersonClick = { personId ->
-                                                navController.navigate(route = "profile/$personId")
+                                                navController.toProfile.navigate(personId)
                                             },
                                             onCommunityClick = { community ->
-                                                navController.navigate(route = "community/${community.id}")
+                                                navController.toCommunity.navigate(community.id)
                                             },
                                             onBlockCreatorClick = { person ->
                                                 account?.also { acct ->
@@ -384,7 +384,7 @@ fun InboxTabs(
                                                 }
                                             },
                                             onPostClick = { postId ->
-                                                navController.navigate(route = "post/$postId")
+                                                navController.toPost.navigate(postId)
                                             },
                                             account = account,
                                             showAvatar = siteViewModel.showAvatar(),
@@ -487,11 +487,14 @@ fun InboxTabs(
                                                 }
                                             },
                                             onReplyClick = { pm ->
-                                                commentReplyViewModel.initialize(
-                                                    ReplyItem
-                                                        .MentionReplyItem(pm),
+                                                navController.toCommentReply.navigate(
+                                                    CommentReplyDependencies(
+                                                        ReplyItem.MentionReplyItem(pm),
+                                                        // TODO(nahwneeth), how to know if mod or not
+                                                        isModerator = false,
+                                                        onCommentReply = null,
+                                                    )
                                                 )
-                                                navController.navigate("commentReply")
                                             },
                                             onSaveClick = { pm ->
                                                 account?.also { acct ->
@@ -521,30 +524,23 @@ fun InboxTabs(
                                                 }
                                             },
                                             onReportClick = { pm ->
-                                                navController.navigate(
-                                                    "commentReport/${
-                                                        pm
-                                                            .comment
-                                                            .id
-                                                    }",
-                                                )
+                                                navController.toComment.navigate(pm.comment.id)
                                             },
                                             onLinkClick = { pm ->
                                                 // Go to the parent comment or post instead for context
                                                 val parent =
                                                     getCommentParentId(pm.comment)
-                                                val route = if (parent != null) {
-                                                    "comment/$parent"
+                                                if (parent != null) {
+                                                    navController.toComment.navigate(parent)
                                                 } else {
-                                                    "post/${pm.post.id}"
+                                                    navController.toPost.navigate(pm.post.id)
                                                 }
-                                                navController.navigate(route)
                                             },
                                             onPersonClick = { personId ->
-                                                navController.navigate(route = "profile/$personId")
+                                                navController.toProfile.navigate(personId)
                                             },
                                             onCommunityClick = { community ->
-                                                navController.navigate(route = "community/${community.id}")
+                                                navController.toCommunity.navigate(community.id)
                                             },
                                             onBlockCreatorClick = { person ->
                                                 account?.also { acct ->
@@ -559,7 +555,7 @@ fun InboxTabs(
                                                 }
                                             },
                                             onPostClick = { postId ->
-                                                navController.navigate(route = "post/$postId")
+                                                navController.toPost.navigate(postId)
                                             },
                                             account = account,
                                             showAvatar = siteViewModel.showAvatar(),
@@ -640,10 +636,9 @@ fun InboxTabs(
                                                 myPersonId = acct.id,
                                                 privateMessageView = message,
                                                 onReplyClick = { privateMessageView ->
-                                                    privateMessageReplyViewModel.initialize(
-                                                        privateMessageView,
+                                                    navController.toPrivateMessageReply.navigate(
+                                                        PrivateMessageReplyDependencies(privateMessageView)
                                                     )
-                                                    navController.navigate("privateMessageReply")
                                                 },
                                                 onMarkAsReadClick = { pm ->
                                                     inboxViewModel.markPrivateMessageAsRead(
@@ -660,7 +655,7 @@ fun InboxTabs(
                                                     )
                                                 },
                                                 onPersonClick = { personId ->
-                                                    navController.navigate(route = "profile/$personId")
+                                                    navController.toProfile.navigate(personId)
                                                 },
                                                 account = acct,
                                                 showAvatar = siteViewModel.showAvatar(),

@@ -12,24 +12,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.jerboa.api.ApiState
+import com.jerboa.datatypes.types.GetPostResponse
 import com.jerboa.db.AccountViewModel
 import com.jerboa.isModerator
+import com.jerboa.nav.initializeOnce
 import com.jerboa.ui.components.common.LoadingBar
 import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.home.SiteViewModel
-import com.jerboa.ui.components.person.PersonProfileViewModel
-import com.jerboa.ui.components.post.PostViewModel
 
 @Composable
 fun CommentReplyActivity(
-    commentReplyViewModel: CommentReplyViewModel,
+    replyItem: ReplyItem,
     accountViewModel: AccountViewModel,
-    personProfileViewModel: PersonProfileViewModel,
-    postViewModel: PostViewModel,
+    isModerator: Boolean,
     siteViewModel: SiteViewModel,
-    navController: NavController,
+    onCommentReply: OnCommentReply?,
+    navController: CommentReplyNavController,
 ) {
     Log.d("jerboa", "got to comment reply activity")
 
@@ -37,14 +38,27 @@ fun CommentReplyActivity(
     var reply by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(
             TextFieldValue
-            (""),
+                (""),
         )
     }
 
     val focusManager = LocalFocusManager.current
+
+    val commentReplyViewModel: CommentReplyViewModel = viewModel()
+    initializeOnce(commentReplyViewModel) {
+        commentReplyViewModel.initialize(replyItem)
+    }
+
+
     val loading = when (commentReplyViewModel.createCommentRes) {
         ApiState.Loading -> true
         else -> false
+    }
+
+    val onSuccess: OnCommentReply = { cv ->
+        focusManager.clearFocus()
+        onCommentReply?.invoke(cv)
+        navController.navigateUp()
     }
 
     Scaffold(
@@ -57,10 +71,7 @@ fun CommentReplyActivity(
                         commentReplyViewModel.createComment(
                             content = reply.text,
                             account = acct,
-                            navController = navController,
-                            focusManager = focusManager,
-                            personProfileViewModel = personProfileViewModel,
-                            postViewModel = postViewModel,
+                            onSuccess = onSuccess,
                         )
                     }
                 },
@@ -70,9 +81,9 @@ fun CommentReplyActivity(
             if (loading) {
                 LoadingBar(padding)
             } else {
-                when (val postRes = postViewModel.postRes) {
-                    is ApiState.Success -> {
-                        val moderators = postRes.data.moderators
+//                when (postResponse) {
+//                    is ApiState.Success -> {
+//                        val moderators = postResponse.data.moderators
 
                         commentReplyViewModel.replyItem?.let { replyItem ->
                             when (replyItem) {
@@ -83,12 +94,9 @@ fun CommentReplyActivity(
                                         reply = reply,
                                         onReplyChange = { reply = it },
                                         onPersonClick = { personId ->
-                                            navController.navigate(route = "profile/$personId")
+                                            navController.toProfile.navigate(personId)
                                         },
-                                        isModerator = isModerator(
-                                            replyItem.item.creator,
-                                            moderators,
-                                        ),
+                                        isModerator = isModerator,
                                         modifier = Modifier
                                             .padding(padding)
                                             .imePadding(),
@@ -101,12 +109,9 @@ fun CommentReplyActivity(
                                     reply = reply,
                                     onReplyChange = { reply = it },
                                     onPersonClick = { personId ->
-                                        navController.navigate(route = "profile/$personId")
+                                        navController.toProfile.navigate(personId)
                                     },
-                                    isModerator = isModerator(
-                                        replyItem.item.creator,
-                                        moderators,
-                                    ),
+                                    isModerator = isModerator,
                                     modifier = Modifier
                                         .padding(padding)
                                         .imePadding(),
@@ -119,7 +124,7 @@ fun CommentReplyActivity(
                                         reply = reply,
                                         onReplyChange = { reply = it },
                                         onPersonClick = { personId ->
-                                            navController.navigate(route = "profile/$personId")
+                                            navController.toProfile.navigate(personId)
                                         },
                                         modifier = Modifier
                                             .padding(padding)
@@ -134,7 +139,7 @@ fun CommentReplyActivity(
                                         reply = reply,
                                         onReplyChange = { reply = it },
                                         onPersonClick = { personId ->
-                                            navController.navigate(route = "profile/$personId")
+                                            navController.toProfile.navigate(personId)
                                         },
                                         modifier = Modifier
                                             .padding(padding)
@@ -145,9 +150,9 @@ fun CommentReplyActivity(
                         }
                     }
 
-                    else -> {}
-                }
-            }
+//                    else -> {}
+//                }
+//            }
         },
     )
 }

@@ -14,7 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jerboa.DEBOUNCE_DELAY
 import com.jerboa.api.ApiState
 import com.jerboa.datatypes.types.Search
@@ -22,10 +22,9 @@ import com.jerboa.datatypes.types.SearchType
 import com.jerboa.datatypes.types.SortType
 import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
-import com.jerboa.loginFirstToast
+import com.jerboa.nav.initializeOnce
 import com.jerboa.ui.components.common.ApiEmptyText
 import com.jerboa.ui.components.common.ApiErrorText
-import com.jerboa.ui.components.common.BottomAppBarAll
 import com.jerboa.ui.components.common.LoadingBar
 import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.home.SiteViewModel
@@ -37,12 +36,10 @@ private var fetchCommunitiesJob: Job? = null
 
 @Composable
 fun CommunityListActivity(
-    navController: NavController,
-    communityListViewModel: CommunityListViewModel,
+    navController: CommunityListNavController,
     accountViewModel: AccountViewModel,
     siteViewModel: SiteViewModel,
-    appSettingsViewModel: AppSettingsViewModel,
-    selectMode: Boolean = false,
+    onSelectCommunity: OnSelectCommunity?
 ) {
     Log.d("jerboa", "got to community list activity")
 
@@ -52,6 +49,12 @@ fun CommunityListActivity(
 
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
+
+    val communityListViewModel: CommunityListViewModel = viewModel()
+    initializeOnce(communityListViewModel) {
+        // Whenever navigating here, reset the list with your followed communities
+        communityListViewModel.setCommunityListFromFollowed(siteViewModel)
+    }
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Scaffold(
@@ -87,13 +90,8 @@ fun CommunityListActivity(
                     is ApiState.Success -> {
                         CommunityListings(
                             communities = communitiesRes.data.communities,
-                            onClickCommunity = { cs ->
-                                if (selectMode) {
-                                    communityListViewModel.selectCommunity(cs)
-                                    navController.navigateUp()
-                                } else {
-                                    navController.navigate(route = "community/${cs.id}")
-                                }
+                            onClickCommunity = onSelectCommunity ?: { cs ->
+                                navController.toCommunity.navigate(cs.id)
                             },
                             modifier = Modifier
                                 .padding(padding)
@@ -101,36 +99,7 @@ fun CommunityListActivity(
                         )
                     }
                 }
-            },
-            bottomBar = {
-                BottomAppBarAll(
-                    showBottomNav = appSettingsViewModel.appSettings.value?.showBottomNav,
-                    screen = "communityList",
-                    unreadCount = siteViewModel.getUnreadCountTotal(),
-                    onClickProfile = {
-                        account?.id?.also {
-                            navController.navigate(route = "profile/$it")
-                        } ?: run {
-                            loginFirstToast(ctx)
-                        }
-                    },
-                    onClickInbox = {
-                        account?.also {
-                            navController.navigate(route = "inbox")
-                        } ?: run {
-                            loginFirstToast(ctx)
-                        }
-                    },
-                    onClickSaved = {
-                        account?.id?.also {
-                            navController.navigate(route = "profile/$it?saved=${true}")
-                        } ?: run {
-                            loginFirstToast(ctx)
-                        }
-                    },
-                    navController = navController,
-                )
-            },
+            }
         )
     }
 }

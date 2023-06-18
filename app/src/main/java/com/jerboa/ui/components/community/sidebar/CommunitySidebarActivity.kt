@@ -16,7 +16,7 @@ import com.jerboa.ui.components.community.CommunityViewModel
 @Composable
 fun CommunitySidebarActivity(
     communityViewModel: CommunityViewModel,
-    navController: NavController,
+    navController: CommunitySideBarNavController,
 ) {
     Log.d("jerboa", "got to community sidebar activity")
 

@@ -28,12 +28,14 @@ import com.jerboa.datatypes.types.SavePost
 import com.jerboa.datatypes.types.SortType
 import com.jerboa.findAndUpdateComment
 import com.jerboa.findAndUpdatePost
+import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
 import com.jerboa.showBlockCommunityToast
 import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
-class PersonProfileViewModel : ViewModel() {
+class PersonProfileViewModel : ViewModel(), Initializable {
+    override var initialized = false
 
     var personDetailsRes: ApiState<GetPersonDetailsResponse> by mutableStateOf(
         ApiState.Empty,

@@ -9,25 +9,31 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.jerboa.api.ApiState
+import com.jerboa.datatypes.types.CommentView
 import com.jerboa.db.AccountViewModel
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.nav.initializeOnce
 import com.jerboa.ui.components.common.getCurrentAccount
-import com.jerboa.ui.components.person.PersonProfileViewModel
-import com.jerboa.ui.components.post.PostViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommentEditActivity(
+    commentView: CommentView,
     accountViewModel: AccountViewModel,
-    navController: NavController,
-    commentEditViewModel: CommentEditViewModel,
-    personProfileViewModel: PersonProfileViewModel,
-    postViewModel: PostViewModel,
+    navController: CommentEditNavController,
+    onCommentEdit: OnCommentEdit?,
 ) {
     Log.d("jerboa", "got to comment edit activity")
 
     val account = getCurrentAccount(accountViewModel = accountViewModel)
+
+    val commentEditViewModel: CommentEditViewModel = viewModel()
+    initializeOnce(commentEditViewModel) {
+        initialize(commentView)
+    }
 
     var content by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(commentEditViewModel.commentView.value?.comment?.content.orEmpty())) }
 
@@ -37,6 +43,12 @@ fun CommentEditActivity(
     }
 
     val focusManager = LocalFocusManager.current
+
+    val onEditFinish: OnCommentEdit = { cv ->
+        focusManager.clearFocus()
+        onCommentEdit?.invoke(cv)
+        navController.navigateUp()
+    }
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Scaffold(
@@ -48,11 +60,8 @@ fun CommentEditActivity(
                         account?.also { acct ->
                             commentEditViewModel.editComment(
                                 content = content.text,
-                                navController = navController,
-                                focusManager = focusManager,
                                 account = acct,
-                                personProfileViewModel = personProfileViewModel,
-                                postViewModel = postViewModel,
+                                onEditFinish = onEditFinish,
                             )
                         }
                     },

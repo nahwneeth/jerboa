@@ -18,9 +18,11 @@ import com.jerboa.datatypes.types.CreateCommentReport
 import com.jerboa.datatypes.types.CreatePostReport
 import com.jerboa.datatypes.types.PostReportResponse
 import com.jerboa.db.Account
+import com.jerboa.nav.Initializable
 import kotlinx.coroutines.launch
 
-class CreateReportViewModel : ViewModel() {
+class CreateReportViewModel : ViewModel(), Initializable {
+    override var initialized = false
 
     private var commentId by mutableStateOf<Int?>(null)
     private var postId by mutableStateOf<Int?>(null)
@@ -35,6 +37,7 @@ class CreateReportViewModel : ViewModel() {
     ) {
         commentId = newCommentId
         postId = null
+        initialized = true
     }
 
     fun setPostId(
@@ -42,14 +45,14 @@ class CreateReportViewModel : ViewModel() {
     ) {
         postId = newPostId
         commentId = null
+        initialized = true
     }
 
     fun createCommentReport(
         reason: String,
         account: Account,
         ctx: Context,
-        navController: NavController,
-        focusManager: FocusManager,
+        onFinish: () -> Unit,
     ) {
         commentId?.also { cId ->
             viewModelScope.launch {
@@ -74,8 +77,9 @@ class CreateReportViewModel : ViewModel() {
                 }
 
                 Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
-                focusManager.clearFocus()
-                navController.navigateUp()
+                onFinish()
+                // focusManager.clearFocus()
+                // navController.navigateUp()
             }
         }
     }
@@ -84,8 +88,7 @@ class CreateReportViewModel : ViewModel() {
         reason: String,
         account: Account,
         ctx: Context,
-        navController: NavController,
-        focusManager: FocusManager,
+        onFinish: () -> Unit,
     ) {
         postId?.also { pId ->
             viewModelScope.launch {
@@ -110,8 +113,9 @@ class CreateReportViewModel : ViewModel() {
                 }
 
                 Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
-                focusManager.clearFocus()
-                navController.navigateUp()
+                onFinish()
+                // focusManager.clearFocus()
+                // navController.navigateUp()
             }
         }
     }

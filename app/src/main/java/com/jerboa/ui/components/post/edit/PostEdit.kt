@@ -24,6 +24,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.jerboa.R
 import com.jerboa.db.Account
+import com.jerboa.nav.NavControllerWrapper
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.MarkdownTextField
 import com.jerboa.ui.components.common.PickImage
 import com.jerboa.ui.theme.MEDIUM_PADDING
@@ -33,7 +35,7 @@ import com.jerboa.validateUrl
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditPostHeader(
-    navController: NavController = rememberNavController(),
+    navController: NavControllerWrapper,
     onEditPostClick: () -> Unit,
     formValid: Boolean,
     loading: Boolean,
@@ -62,19 +64,7 @@ fun EditPostHeader(
                 }
             }
         },
-        navigationIcon = {
-            IconButton(
-                onClick = {
-                    navController.popBackStack()
-                },
-            ) {
-                // Todo add are you sure cancel dialog
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = stringResource(R.string.post_edit_close),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
     )
 }
 

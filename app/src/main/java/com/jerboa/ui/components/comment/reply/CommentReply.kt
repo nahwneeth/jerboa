@@ -24,9 +24,11 @@ import com.jerboa.datatypes.types.CommentView
 import com.jerboa.datatypes.types.PersonMentionView
 import com.jerboa.datatypes.types.PostView
 import com.jerboa.db.Account
+import com.jerboa.nav.NavControllerWrapper
 import com.jerboa.ui.components.comment.CommentNodeHeader
 import com.jerboa.ui.components.comment.mentionnode.CommentMentionNodeHeader
 import com.jerboa.ui.components.comment.replynode.CommentReplyNodeHeader
+import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.MarkdownTextField
 import com.jerboa.ui.components.post.PostNodeHeader
 import com.jerboa.ui.theme.LARGE_PADDING
@@ -35,7 +37,7 @@ import com.jerboa.ui.theme.MEDIUM_PADDING
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommentReplyHeader(
-    navController: NavController = rememberNavController(),
+    navController: NavControllerWrapper,
     onSendClick: () -> Unit,
     loading: Boolean,
 ) {
@@ -62,18 +64,7 @@ fun CommentReplyHeader(
                 }
             }
         },
-        navigationIcon = {
-            IconButton(
-                onClick = {
-                    navController.popBackStack()
-                },
-            ) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = stringResource(R.string.comment_reply_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
     )
 }
 

@@ -31,6 +31,8 @@ import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
 class HomeViewModel : ViewModel() {
+    var initialized = false
+
     var postsRes: ApiState<GetPostsResponse> by mutableStateOf(ApiState.Empty)
         private set
 

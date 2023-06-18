@@ -16,7 +16,9 @@ import com.jerboa.api.apiWrapper
 import com.jerboa.api.retrofitErrorHandler
 import com.jerboa.datatypes.types.GetPosts
 import com.jerboa.datatypes.types.GetSite
+import com.jerboa.datatypes.types.ListingType
 import com.jerboa.datatypes.types.Login
+import com.jerboa.datatypes.types.SortType
 import com.jerboa.db.Account
 import com.jerboa.db.AccountViewModel
 import com.jerboa.serializeToMap
@@ -33,11 +35,10 @@ class LoginViewModel : ViewModel() {
     fun login(
         instance: String,
         form: Login,
-        navController: NavController,
         accountViewModel: AccountViewModel,
         siteViewModel: SiteViewModel,
-        homeViewModel: HomeViewModel,
         ctx: Context,
+        onSuccess: () -> Unit,
     ) {
         val originalInstance = API.currentInstance
         val api = API.changeLemmyInstance(instance)
@@ -104,15 +105,15 @@ class LoginViewModel : ViewModel() {
                         defaultSortType = luv.local_user.default_sort_type.ordinal,
                     )
 
-                    homeViewModel.resetPage()
-                    homeViewModel.getPosts(
-                        GetPosts(
-                            type_ = luv.local_user.default_listing_type,
-                            sort = luv.local_user.default_sort_type,
-                            page = homeViewModel.page,
-                            auth = account.jwt,
-                        ),
-                    )
+//                    homeViewModel.resetPage()
+//                    homeViewModel.getPosts(
+//                        GetPosts(
+//                            type_ = luv.local_user.default_listing_type,
+//                            sort = luv.local_user.default_sort_type,
+//                            page = homeViewModel.page,
+//                            auth = account.jwt,
+//                        ),
+//                    )
 
                     // Remove the default account
                     accountViewModel.removeCurrent()
@@ -122,7 +123,8 @@ class LoginViewModel : ViewModel() {
 
                     loading = false
 
-                    navController.navigate(route = "home")
+//                    navController.navigate(route = "home")
+                    onSuccess()
                 }
 
                 else -> {}

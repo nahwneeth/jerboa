@@ -12,13 +12,16 @@ import com.jerboa.api.apiWrapper
 import com.jerboa.datatypes.types.EditPost
 import com.jerboa.datatypes.types.PostResponse
 import com.jerboa.datatypes.types.PostView
+import com.jerboa.nav.Initializable
 import com.jerboa.ui.components.community.CommunityViewModel
 import com.jerboa.ui.components.home.HomeViewModel
 import com.jerboa.ui.components.person.PersonProfileViewModel
 import com.jerboa.ui.components.post.PostViewModel
 import kotlinx.coroutines.launch
 
-class PostEditViewModel : ViewModel() {
+class PostEditViewModel : ViewModel(), Initializable {
+    override var initialized = false
+
     var postView by mutableStateOf<PostView?>(null)
         private set
     var editPostRes: ApiState<PostResponse> by mutableStateOf(ApiState.Empty)
@@ -32,11 +35,7 @@ class PostEditViewModel : ViewModel() {
 
     fun editPost(
         form: EditPost,
-        navController: NavController,
-        personProfileViewModel: PersonProfileViewModel,
-        postViewModel: PostViewModel,
-        communityViewModel: CommunityViewModel,
-        homeViewModel: HomeViewModel,
+        onSuccess: OnPostEdit,
     ) {
         viewModelScope.launch {
             editPostRes = ApiState.Loading
@@ -51,12 +50,13 @@ class PostEditViewModel : ViewModel() {
                     postView = post
 
                     // Update the other view models
-                    postViewModel.updatePost(post)
-                    personProfileViewModel.updatePost(post)
-                    communityViewModel.updatePost(post)
-                    homeViewModel.updatePost(post)
+                    // postViewModel.updatePost(post)
+                    // personProfileViewModel.updatePost(post)
+                    // communityViewModel.updatePost(post)
+                    // homeViewModel.updatePost(post)
 
-                    navController.popBackStack()
+                    // navController.popBackStack()
+                    onSuccess(post)
                 }
                 else -> {}
             }
