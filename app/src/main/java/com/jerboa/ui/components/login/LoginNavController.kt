@@ -9,5 +9,4 @@ typealias ToLogin = NavigateWithNoArgsAndDependencies
 
 class LoginNavController(
     override val navController: NavController,
-    val toHome: ToHome,
 ) : NavControllerWrapper()

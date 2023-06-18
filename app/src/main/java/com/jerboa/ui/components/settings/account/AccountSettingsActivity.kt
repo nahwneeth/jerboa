@@ -9,6 +9,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.jerboa.R
 import com.jerboa.db.AccountViewModel
@@ -21,7 +22,6 @@ import com.jerboa.ui.components.settings.AccountSettingsNavController
 @Composable
 fun AccountSettingsActivity(
     navController: AccountSettingsNavController,
-    accountSettingsViewModel: AccountSettingsViewModel,
     accountViewModel: AccountViewModel,
     siteViewModel: SiteViewModel,
 ) {
@@ -29,6 +29,8 @@ fun AccountSettingsActivity(
 
     val account = getCurrentAccount(accountViewModel = accountViewModel)
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val accountSettingsViewModel: AccountSettingsViewModel = viewModel()
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },

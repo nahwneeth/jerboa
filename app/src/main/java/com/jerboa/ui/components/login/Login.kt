@@ -225,7 +225,6 @@ fun LoginHeaderPreview() {
     LoginHeader(
         LoginNavController(
             rememberNavController(),
-            toHome = ToHome { }
         ),
     )
 }

@@ -13,7 +13,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.jerboa.datatypes.types.LocalUserView
+import com.jerboa.datatypes.types.MyUserInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.scopes.ActivityScoped
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
@@ -144,11 +147,6 @@ interface AppSettingsDao {
 // Declares the DAO as a private property in the constructor. Pass in the DAO
 // instead of the whole database, because you only need access to the DAO
 class AccountRepository(private val accountDao: AccountDao) {
-
-    init {
-        Log.d("Flow Combine", "account repo created")
-    }
-
     // Room executes all queries on a separate thread.
     // Observed Flow will notify the observer when the data has changed.
     val allAccounts = accountDao.getAll()
@@ -433,7 +431,9 @@ abstract class AppDB : RoomDatabase() {
 }
 
 @HiltViewModel
-class AccountViewModel @Inject constructor(private val repository: AccountRepository) : ViewModel() {
+class AccountViewModel @Inject constructor(
+    private val repository: AccountRepository
+) : ViewModel() {
 
     val allAccounts = repository.allAccounts
 
@@ -468,7 +468,9 @@ class AccountViewModelFactory(private val repository: AccountRepository) :
 }
 
 @HiltViewModel
-class AppSettingsViewModel @Inject constructor(private val repository: AppSettingsRepository) : ViewModel() {
+class AppSettingsViewModel @Inject constructor(
+    private val repository: AppSettingsRepository
+) : ViewModel() {
 
     val appSettings = repository.appSettings
 

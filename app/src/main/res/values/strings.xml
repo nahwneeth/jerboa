@@ -294,4 +294,8 @@
     <string name="downvote">Downvote</string>
     <string name="upvoted">Upvoted</string>
     <string name="downvoted">Downvoted</string>
+    <string name="error_retrieving_user_info">Error retrieving user info.</string>
+    <string name="failed_to_retrieve_site_user_info"><![CDATA[Failed to retrieve site & user info.]]></string>
+    <string name="retry">Retry</string>
+    <string name="loading_site_account_info"><![CDATA[Loading site & account info.]]></string>
 </resources>
