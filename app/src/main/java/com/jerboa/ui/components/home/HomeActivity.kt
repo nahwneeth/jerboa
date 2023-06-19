@@ -34,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -43,7 +42,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -54,12 +52,12 @@ import com.jerboa.R
 import com.jerboa.api.ApiState
 import com.jerboa.datatypes.types.GetSiteResponse
 import com.jerboa.datatypes.types.GetUnreadCountResponse
-import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
+import com.jerboa.nav.Route
 import com.jerboa.ui.components.common.InboxIconAndBadge
-import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.community.list.CommunityListActivity
 import com.jerboa.ui.components.community.list.CommunityListNavController
+import com.jerboa.ui.components.community.list.FollowedCommunitiesViewModel
 import com.jerboa.ui.components.inbox.InboxActivity
 import com.jerboa.ui.components.inbox.InboxNavController
 import com.jerboa.ui.components.person.PersonProfileActivity
@@ -70,6 +68,7 @@ import com.jerboa.ui.components.person.PersonProfileNavController
 fun HomeActivity(
     selectTabArg: HomeTab,
     siteRes: GetSiteResponse,
+    followedCommunitiesViewModel: FollowedCommunitiesViewModel,
     appSettingsViewModel: AppSettingsViewModel,
     feedNavController: FeedNavController,
     communityListNavController: CommunityListNavController,
@@ -94,7 +93,15 @@ fun HomeActivity(
     val account by homeViewModel.account.observeAsState()
 
     val bottomNavController = rememberNavController()
-    var selectedTab by rememberSaveable { mutableStateOf(HomeTab.Feed) }
+    var selectedTab by rememberSaveable {
+        mutableStateOf(
+            if (selectTabArg.needsLogin() && account == null) {
+                Route.HomeArgs.TAB_DEFAULT
+            } else {
+                selectTabArg
+            }
+        )
+    }
 
     val onSelectTab = { tab: HomeTab ->
         if (tab.needsLogin() && account == null) {
@@ -105,10 +112,6 @@ fun HomeActivity(
                 popUpTo(0)
             }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        onSelectTab(selectTabArg)
     }
 
     ModalNavigationDrawer(
@@ -138,7 +141,7 @@ fun HomeActivity(
                 content = { padding ->
                     NavHost(
                         navController = bottomNavController,
-                        startDestination = HomeTab.Feed.name,
+                        startDestination = selectedTab.name,
                         modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
                     ) {
                         composable(HomeTab.Feed.name) {
@@ -153,8 +156,7 @@ fun HomeActivity(
 
                         composable(HomeTab.Search.name) {
                             CommunityListActivity(
-                                accountViewModel = hiltViewModel(),
-                                siteViewModel = hiltViewModel(),
+                                followedCommunitiesViewModel = followedCommunitiesViewModel,
                                 onSelectCommunity = null,
                                 navController = communityListNavController,
                             )
@@ -162,8 +164,8 @@ fun HomeActivity(
 
                         composable(HomeTab.Inbox.name) {
                             InboxActivity(
-                                accountViewModel = hiltViewModel(),
-                                siteViewModel = hiltViewModel(),
+                                siteResponse = siteRes,
+                                homeViewModel = homeViewModel,
                                 navController = inboxNavController,
                             )
                         }
@@ -292,7 +294,7 @@ fun BottomNavBar(
 }
 
 fun ApiState<GetUnreadCountResponse>.totalUnreadCount(): Int? {
-    return when(this) {
+    return when (this) {
         is ApiState.Success -> data.mentions + data.replies + data.private_messages
         else -> null
     }

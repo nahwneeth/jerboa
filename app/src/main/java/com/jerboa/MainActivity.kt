@@ -69,6 +69,7 @@ import com.jerboa.ui.components.community.CommunityViewModel
 import com.jerboa.ui.components.community.list.CommunityListActivity
 import com.jerboa.ui.components.community.list.CommunityListDependencies
 import com.jerboa.ui.components.community.list.CommunityListNavController
+import com.jerboa.ui.components.community.list.FollowedCommunitiesViewModel
 import com.jerboa.ui.components.community.sidebar.CommunitySideBarNavController
 import com.jerboa.ui.components.community.sidebar.CommunitySidebarActivity
 import com.jerboa.ui.components.home.*
@@ -156,6 +157,11 @@ fun AppContent(
     val privateMessageReplyDependencyContainer =
         dependencyContainer<PrivateMessageReplyDependencies>()
 
+    val followedCommunitiesViewModel: FollowedCommunitiesViewModel = viewModel()
+    LaunchedEffect(siteRes) {
+        followedCommunitiesViewModel.addFollowing(siteRes)
+    }
+
     AnimatedNavHost(
         navController = navController,
         startDestination = Route.HOME,
@@ -174,6 +180,17 @@ fun AppContent(
         }
 
         composable(
+            route = Route.INBOX,
+            deepLinks = DEFAULT_LEMMY_INSTANCES.map { instance ->
+                navDeepLink {uriPattern = "$instance/inbox" }
+            },
+        ) {
+            navController.navigate(Route.HomeArgs.makeRoute(tab = HomeTab.Inbox.name)) {
+                popUpTo(0)
+            }
+        }
+
+        composable(
             route = Route.HOME,
             arguments = listOf(
                 navArgument(Route.HomeArgs.TAB) {
@@ -181,16 +198,11 @@ fun AppContent(
                     defaultValue = Route.HomeArgs.TAB_DEFAULT.name
                 }
             ),
-            deepLinks = DEFAULT_LEMMY_INSTANCES.map { instance ->
-                navDeepLink {
-                    uriPattern = "$instance/inbox"
-                    action = Route.HomeArgs.makeRoute(tab = HomeTab.Inbox.name)
-                }
-            },
         ) {
             val args = Route.HomeArgs(it)
             HomeActivity(
                 siteRes = siteRes,
+                followedCommunitiesViewModel = followedCommunitiesViewModel,
                 appSettingsViewModel = appSettingsViewModel,
                 selectTabArg = args.tab,
                 feedNavController = FeedNavController(
@@ -423,8 +435,7 @@ fun AppContent(
                 viewModel(it, factory = communityListDependencyContainer)
 
             CommunityListActivity(
-                accountViewModel = accountViewModel,
-                siteViewModel = hiltViewModel(),
+                followedCommunitiesViewModel = followedCommunitiesViewModel,
                 onSelectCommunity = dependencies.onSelectCommunity,
                 navController = CommunityListNavController(
                     navController,

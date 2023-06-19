@@ -66,6 +66,7 @@ class LoginViewModel @Inject constructor(
                     is java.net.UnknownHostException -> LoginError.NotALemmyInstance(instance)
                     else -> LoginError.IncorrectLogin()
                 }
+                loading = false
                 return@launch
             }
 
@@ -94,8 +95,7 @@ class LoginViewModel @Inject constructor(
                 }
                 else -> {}
             }
+            loading = false
         }
-
-        loading = false
     }
 }

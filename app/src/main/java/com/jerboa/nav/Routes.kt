@@ -4,39 +4,38 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import com.jerboa.ui.components.home.HomeTab
 
-class Route {
-    companion object {
-        const val LOGIN = "login"
+object Route {
+    const val LOGIN = "login"
+    const val INBOX = "inbox"
 
-        val HOME = HomeArgs.route
-        val COMMUNITY_FROM_ID = CommunityFromIdArgs.route
-        val COMMUNITY_FROM_URL = CommunityFromUrlArgs.route
+    val HOME = HomeArgs.route
+    val COMMUNITY_FROM_ID = CommunityFromIdArgs.route
+    val COMMUNITY_FROM_URL = CommunityFromUrlArgs.route
 
-        const val COMMUNITY_SIDEBAR = "communitySidebar"
+    const val COMMUNITY_SIDEBAR = "communitySidebar"
 
-        val PROFILE_FROM_ID = ProfileFromIdArgs.route
-        val PROFILE_FROM_URL = ProfileFromUrlArgs.route
+    val PROFILE_FROM_ID = ProfileFromIdArgs.route
+    val PROFILE_FROM_URL = ProfileFromUrlArgs.route
 
-        const val COMMUNITY_LIST = "communityList"
-        const val CREATE_POST = "createPost"
+    const val COMMUNITY_LIST = "communityList"
+    const val CREATE_POST = "createPost"
 
-        val POST = PostArgs.route
-        val COMMENT = CommentArgs.route
+    val POST = PostArgs.route
+    val COMMENT = CommentArgs.route
 
-        const val COMMENT_REPLY = "commentReply"
-        const val SITE_SIDEBAR = "siteSidebar"
-        const val COMMENT_EDIT = "commentEdit"
-        const val POST_EDIT = "postEdit"
-        const val PRIVATE_MESSAGE_REPLY = "privateMessageReply"
+    const val COMMENT_REPLY = "commentReply"
+    const val SITE_SIDEBAR = "siteSidebar"
+    const val COMMENT_EDIT = "commentEdit"
+    const val POST_EDIT = "postEdit"
+    const val PRIVATE_MESSAGE_REPLY = "privateMessageReply"
 
-        val COMMENT_REPORT = CommentReportArgs.route
-        val POST_REPORT = PostReportArgs.route
+    val COMMENT_REPORT = CommentReportArgs.route
+    val POST_REPORT = PostReportArgs.route
 
-        const val SETTINGS = "settings"
-        const val LOOK_AND_FEEL = "lookAndFeel"
-        const val ACCOUNT_SETTINGS = "accountSettings"
-        const val ABOUT = "about"
-    }
+    const val SETTINGS = "settings"
+    const val LOOK_AND_FEEL = "lookAndFeel"
+    const val ACCOUNT_SETTINGS = "accountSettings"
+    const val ABOUT = "about"
 
     class HomeArgs(val tab: HomeTab) {
         constructor(navBackStackEntry: NavBackStackEntry) :

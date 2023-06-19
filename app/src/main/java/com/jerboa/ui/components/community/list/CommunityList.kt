@@ -16,6 +16,9 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -31,20 +34,19 @@ import com.jerboa.ui.components.common.DefaultBackButton
 import com.jerboa.ui.components.common.simpleVerticalScrollbar
 import com.jerboa.ui.components.community.CommunityLinkLarger
 import com.jerboa.ui.components.community.CommunityLinkLargerWithUserCount
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityListHeader(
     navController: NavControllerWrapper,
-    search: String,
-    onSearchChange: (search: String) -> Unit,
+    searchFlow: MutableStateFlow<String>,
 ) {
     TopAppBar(
         title = {
-            CommunityTopBarSearchView(
-                search = search,
-                onSearchChange = onSearchChange,
-            )
+            CommunityTopBarSearchView(searchFlow = searchFlow)
         },
         actions = {
             IconButton(
@@ -106,13 +108,13 @@ fun CommunityListingsPreview() {
 }
 
 @Composable
-fun CommunityTopBarSearchView(
-    search: String,
-    onSearchChange: (search: String) -> Unit,
-) {
+fun CommunityTopBarSearchView(searchFlow: MutableStateFlow<String>) {
+    val scope = rememberCoroutineScope()
+    val search by searchFlow.collectAsState()
+
     TextField(
         value = search,
-        onValueChange = onSearchChange,
+        onValueChange = { scope.launch { searchFlow.emit(it) } },
         textStyle = MaterialTheme.typography.bodyLarge,
         placeholder = {
             Text(stringResource(R.string.community_list_search))
@@ -121,9 +123,9 @@ fun CommunityTopBarSearchView(
             .fillMaxWidth(),
         trailingIcon = {
             if (search.isNotEmpty()) {
-                IconButton(
-                    onClick = { onSearchChange("") },
-                ) {
+                IconButton(onClick = {
+                    scope.launch { searchFlow.emit("") }
+                }) {
                     Icon(
                         Icons.Outlined.Close,
                         contentDescription = "",
@@ -149,8 +151,5 @@ fun CommunityTopBarSearchView(
 @Preview(showBackground = true)
 @Composable
 fun SearchViewPreview() {
-    CommunityTopBarSearchView(
-        search = "",
-        onSearchChange = {},
-    )
+    CommunityTopBarSearchView(MutableStateFlow(""))
 }

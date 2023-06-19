@@ -63,6 +63,7 @@
               <data android:host="slrpnk.net" />
               <data android:host="sopuli.xyz" />
               <data android:host="szmer.info" />
+              <data android:host="voyager.lemmy.ml" />
             </intent-filter>
         </activity>
     </application>

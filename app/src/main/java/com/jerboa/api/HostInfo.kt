@@ -17,7 +17,7 @@ class HostInfo(instance: String = DEFAULT_INSTANCE) {
         }
 
     companion object {
-        const val DEFAULT_INSTANCE = "enterprise.lemmy.ml"
+        const val DEFAULT_INSTANCE = "enterprise.lemmy.ml" // TODO change to lemmy.ml
         private const val VERSION = "v3"
 
         private fun buildApiUrl(instance: String) = "https://$instance/api/$VERSION/"

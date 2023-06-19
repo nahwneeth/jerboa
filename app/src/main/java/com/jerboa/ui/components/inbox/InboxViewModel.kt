@@ -4,16 +4,23 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import com.jerboa.VoteType
 import com.jerboa.api.API
 import com.jerboa.api.ApiState
 import com.jerboa.api.apiWrapper
+import com.jerboa.appendData
 import com.jerboa.datatypes.types.BlockCommunity
 import com.jerboa.datatypes.types.BlockCommunityResponse
 import com.jerboa.datatypes.types.BlockPerson
 import com.jerboa.datatypes.types.BlockPersonResponse
+import com.jerboa.datatypes.types.CommentReply
+import com.jerboa.datatypes.types.CommentReplyView
 import com.jerboa.datatypes.types.CommentResponse
+import com.jerboa.datatypes.types.CommentSortType
 import com.jerboa.datatypes.types.CreateCommentLike
 import com.jerboa.datatypes.types.GetPersonMentions
 import com.jerboa.datatypes.types.GetPersonMentionsResponse
@@ -24,36 +31,243 @@ import com.jerboa.datatypes.types.MarkAllAsRead
 import com.jerboa.datatypes.types.MarkCommentReplyAsRead
 import com.jerboa.datatypes.types.MarkPersonMentionAsRead
 import com.jerboa.datatypes.types.MarkPrivateMessageAsRead
+import com.jerboa.datatypes.types.Person
 import com.jerboa.datatypes.types.PersonMentionResponse
+import com.jerboa.datatypes.types.PersonMentionView
 import com.jerboa.datatypes.types.PrivateMessageResponse
+import com.jerboa.datatypes.types.PrivateMessageView
 import com.jerboa.datatypes.types.PrivateMessagesResponse
 import com.jerboa.datatypes.types.SaveComment
+import com.jerboa.db.Account
 import com.jerboa.findAndUpdateCommentReply
 import com.jerboa.findAndUpdateMention
 import com.jerboa.findAndUpdatePersonMention
 import com.jerboa.findAndUpdatePrivateMessage
 import com.jerboa.nav.Initializable
+import com.jerboa.newVote
 import com.jerboa.serializeToMap
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.cancellable
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class InboxViewModel : ViewModel(), Initializable {
-    override var initialized = false
+data class InboxFilter(
+    val unreadOnly: Boolean = true,
+    val repliesPage: Int = 1,
+    val mentionsPage: Int = 1,
+    val messagesPage: Int = 1,
+)
 
-    var repliesRes: ApiState<GetRepliesResponse> by mutableStateOf(
-        ApiState.Empty,
-    )
+@HiltViewModel
+class InboxViewModel @Inject constructor(
+    val account: LiveData<Account?>,
+    private val api: API,
+): ViewModel() {
+    val filter = MutableStateFlow(InboxFilter())
+
+    fun updateUnreadOnly(unreadOnly: Boolean) {
+        viewModelScope.launch {
+            filter.emit(InboxFilter().copy(unreadOnly = unreadOnly))
+        }
+    }
+
+    var repliesRes: List<CommentReplyView> by mutableStateOf(listOf())
         private set
-    private var fetchingMoreReplies by mutableStateOf(false)
-    var mentionsRes: ApiState<GetPersonMentionsResponse> by mutableStateOf(
-        ApiState.Empty,
-    )
+
+    var fetchingMoreReplies: ApiState<GetRepliesResponse> by mutableStateOf(ApiState.Empty)
         private set
-    private var fetchingMoreMentions by mutableStateOf(false)
-    var messagesRes: ApiState<PrivateMessagesResponse> by mutableStateOf(
-        ApiState.Empty,
-    )
+
+    init {
+        viewModelScope.launch {
+            combine(
+                account.asFlow().filterNotNull(),
+                filter.distinctUntilChanged { a, b ->
+                    a.unreadOnly == b.unreadOnly && a.repliesPage == b.repliesPage
+                },
+            ) { account, filter ->
+                loadReplies(account, filter)
+            }.collect()
+        }
+    }
+
+    private suspend fun loadReplies(account: Account, filter: InboxFilter) {
+        val form = GetReplies(
+            unread_only = filter.unreadOnly,
+            sort = CommentSortType.New,
+            page = filter.repliesPage,
+            auth = account.jwt,
+        );
+
+        fetchingMoreReplies = ApiState.Loading
+
+        val response = apiWrapper(api.getReplies(form.serializeToMap()))
+        fetchingMoreReplies = response
+
+        when (response) {
+            is ApiState.Success -> {
+                repliesRes = appendData(repliesRes, response.data.replies)
+            }
+            else -> {}
+        }
+    }
+
+    fun reloadReplies() {
+        viewModelScope.launch {
+            filter.emit(filter.value.copy(repliesPage = 1))
+        }
+    }
+
+    fun nextRepliesPage() {
+        viewModelScope.launch {
+            when (fetchingMoreReplies) {
+                is ApiState.Failure -> {
+                    account.value?.let {
+                        loadReplies(account = it, filter = filter.value)
+                    }
+                }
+                is ApiState.Loading -> {}
+                else -> filter.emit(
+                    filter.value.let {
+                        it.copy(repliesPage = it.repliesPage + 1)
+                    }
+                )
+            }
+        }
+    }
+
+    var mentionsRes: List<PersonMentionView> by mutableStateOf(listOf())
         private set
-    private var fetchingMoreMessages by mutableStateOf(false)
+
+    var fetchingMoreMentions: ApiState<GetPersonMentionsResponse> by mutableStateOf(ApiState.Empty)
+        private set
+
+    init {
+        viewModelScope.launch {
+            combine(
+                account.asFlow().filterNotNull(),
+                filter.distinctUntilChanged { a, b ->
+                    a.unreadOnly == b.unreadOnly && a.mentionsPage == b.mentionsPage
+                },
+            ) { account, filter ->
+                loadMentions(account, filter)
+            }.collect()
+        }
+    }
+
+    private suspend fun loadMentions(account: Account, filter: InboxFilter) {
+        val form = GetReplies(
+            unread_only = filter.unreadOnly,
+            sort = CommentSortType.New,
+            page = filter.mentionsPage,
+            auth = account.jwt,
+        );
+
+        fetchingMoreMentions = ApiState.Loading
+
+        val response = apiWrapper(api.getPersonMentions(form.serializeToMap()))
+        fetchingMoreMentions = response
+
+        when (response) {
+            is ApiState.Success -> {
+                mentionsRes = appendData(mentionsRes, response.data.mentions)
+            }
+            else -> {}
+        }
+    }
+
+    fun reloadMentions() {
+        viewModelScope.launch {
+            filter.emit(filter.value.copy(mentionsPage = 1))
+        }
+    }
+
+    fun nextMentionsPage() {
+        viewModelScope.launch {
+            when (fetchingMoreMentions) {
+                is ApiState.Failure -> {
+                    account.value?.let {
+                        loadMentions(account = it, filter = filter.value)
+                    }
+                }
+                is ApiState.Loading -> {}
+                else -> filter.emit(
+                    filter.value.let {
+                        it.copy(mentionsPage = it.mentionsPage + 1)
+                    }
+                )
+            }
+        }
+    }
+
+    var messagesRes: List<PrivateMessageView> by mutableStateOf(listOf())
+        private set
+
+    var fetchingMoreMessages: ApiState<PrivateMessagesResponse> by mutableStateOf(ApiState.Empty)
+        private set
+
+    init {
+        viewModelScope.launch {
+            combine(
+                account.asFlow().filterNotNull(),
+                filter.distinctUntilChanged { a, b ->
+                    a.unreadOnly == b.unreadOnly && a.messagesPage == b.messagesPage
+                },
+            ) { account, filter ->
+                loadMessages(account, filter)
+            }.collect()
+        }
+    }
+
+    private suspend fun loadMessages(account: Account, filter: InboxFilter) {
+        val form = GetReplies(
+            unread_only = filter.unreadOnly,
+            sort = CommentSortType.New,
+            page = filter.messagesPage,
+            auth = account.jwt,
+        );
+
+        fetchingMoreMessages = ApiState.Loading
+
+        val response = apiWrapper(api.getPrivateMessages(form.serializeToMap()))
+        fetchingMoreMessages = response
+
+        when (response) {
+            is ApiState.Success -> {
+                messagesRes = appendData(messagesRes, response.data.private_messages)
+            }
+            else -> {}
+        }
+    }
+
+    fun reloadMessages() {
+        viewModelScope.launch {
+            filter.emit(filter.value.copy(messagesPage = 1))
+        }
+    }
+
+    fun nextMessagesPage() {
+        viewModelScope.launch {
+            when (fetchingMoreMessages) {
+                is ApiState.Failure -> {
+                    account.value?.let {
+                        loadMentions(account = it, filter = filter.value)
+                    }
+                }
+                is ApiState.Loading -> {}
+                else -> filter.emit(
+                    filter.value.let {
+                        it.copy(messagesPage = it.messagesPage + 1)
+                    }
+                )
+            }
+        }
+    }
 
     private var likeReplyRes: ApiState<CommentResponse> by mutableStateOf(ApiState.Empty)
 
@@ -63,427 +277,246 @@ class InboxViewModel : ViewModel(), Initializable {
 
     private var saveMentionRes: ApiState<CommentResponse> by mutableStateOf(ApiState.Empty)
 
-    private var markReplyAsReadRes: ApiState<CommentResponse> by mutableStateOf(ApiState.Empty)
+    var markReplyAsReadRes: ApiState<CommentResponse> by mutableStateOf(ApiState.Empty)
 
-    private var markMentionAsReadRes: ApiState<PersonMentionResponse> by mutableStateOf(ApiState.Empty)
+    var markMentionAsReadRes: ApiState<PersonMentionResponse> by mutableStateOf(ApiState.Empty)
 
-    private var markMessageAsReadRes: ApiState<PrivateMessageResponse> by mutableStateOf(ApiState.Empty)
+    var markMessageAsReadRes: ApiState<PrivateMessageResponse> by mutableStateOf(ApiState.Empty)
 
-    private var markAllAsReadRes: ApiState<GetRepliesResponse> by mutableStateOf(ApiState.Empty)
+    var markAllAsReadRes: ApiState<GetRepliesResponse> by mutableStateOf(ApiState.Empty)
 
-    private var blockCommunityRes: ApiState<BlockCommunityResponse> by
+    var blockCommunityRes: ApiState<BlockCommunityResponse> by
         mutableStateOf(ApiState.Empty)
 
-    private var blockPersonRes: ApiState<BlockPersonResponse> by
+    var blockPersonRes: ApiState<BlockPersonResponse> by
         mutableStateOf(ApiState.Empty)
 
-    var page by mutableStateOf(1)
-        private set
-    var unreadOnly by mutableStateOf(true)
-        private set
-
-    fun resetPage() {
-        page = 1
-    }
-
-    fun nextPage() {
-        page += 1
-    }
-
-    fun updateUnreadOnly(unreadOnly: Boolean) {
-        this.unreadOnly = unreadOnly
-    }
-
-    fun getReplies(
-        form: GetReplies,
-    ) {
+    fun likeReply(commentReplyView: CommentReplyView, voteType: VoteType): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
-            repliesRes = ApiState.Loading
-            repliesRes = apiWrapper(API.getInstance().getReplies(form.serializeToMap()))
-        }
-    }
-
-    fun appendReplies(
-        form: GetReplies,
-    ) {
-        viewModelScope.launch {
-            fetchingMoreReplies = true
-            val more = apiWrapper(API.getInstance().getReplies(form.serializeToMap()))
-
-            // Only append when both new and existing are Successes
-            when (val existing = repliesRes) {
-                is ApiState.Success -> {
-                    when (more) {
-                        is ApiState.Success -> {
-                            val appended = existing.data.replies.toMutableList()
-                            appended.addAll(more.data.replies)
-                            val newRes = ApiState.Success(existing.data.copy(replies = appended))
-                            repliesRes = newRes
-
-                            fetchingMoreReplies = false
-                        }
-
-                        is ApiState.Failure -> {
-                            fetchingMoreReplies = false
-                        }
-
-                        else -> {}
-                    }
-                }
-
-                else -> {}
-            }
-        }
-    }
-
-    fun getMentions(
-        form: GetPersonMentions,
-    ) {
-        viewModelScope.launch {
-            mentionsRes = ApiState.Loading
-            mentionsRes = apiWrapper(API.getInstance().getPersonMentions(form.serializeToMap()))
-        }
-    }
-
-    fun appendMentions(
-        form: GetPersonMentions,
-    ) {
-        viewModelScope.launch {
-            fetchingMoreMentions = true
-            val more = apiWrapper(API.getInstance().getPersonMentions(form.serializeToMap()))
-
-            // Only append when both new and existing are Successes
-            when (val existing = mentionsRes) {
-                is ApiState.Success -> {
-                    when (more) {
-                        is ApiState.Success -> {
-                            val appended = existing.data.mentions.toMutableList()
-                            appended.addAll(more.data.mentions)
-                            val newRes = ApiState.Success(existing.data.copy(mentions = appended))
-                            mentionsRes = newRes
-
-                            fetchingMoreMentions = false
-                        }
-
-                        is ApiState.Failure -> {
-                            fetchingMoreMentions = false
-                        }
-
-                        else -> {}
-                    }
-                }
-
-                else -> {}
-            }
-        }
-    }
-
-    fun getMessages(
-        form: GetPrivateMessages,
-    ) {
-        viewModelScope.launch {
-            messagesRes = ApiState.Loading
-            messagesRes = apiWrapper(API.getInstance().getPrivateMessages(form.serializeToMap()))
-        }
-    }
-
-    fun appendMessages(
-        form: GetPrivateMessages,
-    ) {
-        viewModelScope.launch {
-            fetchingMoreMessages = true
-            val more = apiWrapper(API.getInstance().getPrivateMessages(form.serializeToMap()))
-
-            // Only append when both new and existing are Successes
-            when (val existing = messagesRes) {
-                is ApiState.Success -> {
-                    when (more) {
-                        is ApiState.Success -> {
-                            val appended = existing.data.private_messages.toMutableList()
-                            appended.addAll(more.data.private_messages)
-                            val newRes =
-                                ApiState.Success(existing.data.copy(private_messages = appended))
-                            messagesRes = newRes
-
-                            fetchingMoreMessages = false
-                        }
-
-                        is ApiState.Failure -> {
-                            fetchingMoreMessages = false
-                        }
-
-                        else -> {}
-                    }
-                }
-
-                else -> {}
-            }
-        }
-    }
-
-    fun likeReply(
-        form: CreateCommentLike,
-    ) {
-        viewModelScope.launch {
+            val form = CreateCommentLike(
+                comment_id = commentReplyView.comment.id,
+                score = newVote(commentReplyView.my_vote, voteType),
+                auth = jwt,
+            )
             likeReplyRes = ApiState.Loading
-            likeReplyRes = apiWrapper(API.getInstance().likeComment(form))
-
+            likeReplyRes = apiWrapper(api.likeComment(form))
             when (val likeRes = likeReplyRes) {
                 is ApiState.Success -> {
-                    when (val existing = repliesRes) {
-                        is ApiState.Success -> {
-                            val newReplies =
-                                findAndUpdateCommentReply(
-                                    existing.data.replies,
-                                    likeRes.data.comment_view,
-                                )
-                            val newRes = ApiState.Success(existing.data.copy(replies = newReplies))
-                            repliesRes = newRes
-                        }
-
-                        else -> {}
-                    }
+                    repliesRes = findAndUpdateCommentReply(repliesRes, likeRes.data.comment_view)
                 }
-
                 else -> {}
             }
         }
+        return true
     }
 
-    fun saveReply(
-        form: SaveComment,
-    ) {
+    fun saveReply(commentReplyView: CommentReplyView): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = SaveComment(
+                comment_id = commentReplyView.comment.id,
+                save = !commentReplyView.saved,
+                auth = jwt,
+            )
             saveReplyRes = ApiState.Loading
-            saveReplyRes = apiWrapper(API.getInstance().saveComment(form))
-
+            saveReplyRes = apiWrapper(api.saveComment(form))
             when (val saveRes = saveReplyRes) {
                 is ApiState.Success -> {
-                    when (val existing = repliesRes) {
-                        is ApiState.Success -> {
-                            val newReplies =
-                                findAndUpdateCommentReply(
-                                    existing.data.replies,
-                                    saveRes.data.comment_view,
-                                )
-                            val newRes = ApiState.Success(existing.data.copy(replies = newReplies))
-                            repliesRes = newRes
-                        }
-
-                        else -> {}
-                    }
+                    repliesRes = findAndUpdateCommentReply(repliesRes, saveRes.data.comment_view)
                 }
-
                 else -> {}
             }
         }
+        return true
     }
 
-    fun likeMention(
-        form: CreateCommentLike,
-    ) {
+    fun likeMention(personMentionView: PersonMentionView, voteType: VoteType): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = CreateCommentLike(
+                comment_id = personMentionView.comment.id,
+                score = newVote(personMentionView.my_vote, voteType),
+                auth = jwt,
+            )
             likeMentionRes = ApiState.Loading
-            likeMentionRes = apiWrapper(API.getInstance().likeComment(form))
-
+            likeMentionRes = apiWrapper(api.likeComment(form))
             when (val likeRes = likeMentionRes) {
                 is ApiState.Success -> {
-                    when (val existing = mentionsRes) {
-                        is ApiState.Success -> {
-                            val newMentions =
-                                findAndUpdatePersonMention(
-                                    existing.data.mentions,
-                                    likeRes.data.comment_view,
-                                )
-                            val newRes =
-                                ApiState.Success(existing.data.copy(mentions = newMentions))
-                            mentionsRes = newRes
-                        }
-
-                        else -> {}
-                    }
+                    mentionsRes = findAndUpdatePersonMention(
+                        mentionsRes,
+                        likeRes.data.comment_view,
+                    )
                 }
-
                 else -> {}
             }
         }
+        return true
     }
 
-    fun saveMention(
-        form: SaveComment,
-    ) {
+    fun saveMention(personMentionView: PersonMentionView): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
-            saveReplyRes = ApiState.Loading
-            saveReplyRes = apiWrapper(API.getInstance().saveComment(form))
-
+            val form = SaveComment(
+                comment_id = personMentionView.comment.id,
+                save = !personMentionView.saved,
+                auth = jwt,
+            )
+            saveMentionRes = ApiState.Loading
+            saveMentionRes = apiWrapper(api.saveComment(form))
             when (val saveRes = saveMentionRes) {
                 is ApiState.Success -> {
-                    when (val existing = mentionsRes) {
-                        is ApiState.Success -> {
-                            val newMentions =
-                                findAndUpdatePersonMention(
-                                    existing.data.mentions,
-                                    saveRes.data.comment_view,
-                                )
-                            val newRes =
-                                ApiState.Success(existing.data.copy(mentions = newMentions))
-                            mentionsRes = newRes
-                        }
-
-                        else -> {}
-                    }
+                    mentionsRes = findAndUpdatePersonMention(
+                        mentionsRes,
+                        saveRes.data.comment_view,
+                    )
                 }
-
                 else -> {}
             }
         }
+        return true
     }
 
-    fun markReplyAsRead(
-        form: MarkCommentReplyAsRead,
-    ) {
+    fun markReplyAsRead(commentReplyView: CommentReplyView): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = MarkCommentReplyAsRead(
+                comment_reply_id = commentReplyView.comment_reply.id,
+                read = !commentReplyView.comment_reply.read,
+                auth = jwt,
+            )
+
             markReplyAsReadRes = ApiState.Loading
-            markReplyAsReadRes = apiWrapper(API.getInstance().markCommentReplyAsRead(form))
+            markReplyAsReadRes = apiWrapper(api.markCommentReplyAsRead(form))
 
             when (val readRes = markReplyAsReadRes) {
                 is ApiState.Success -> {
-                    when (val existing = repliesRes) {
-                        is ApiState.Success -> {
-                            val mutable = existing.data.replies.toMutableList()
-                            val foundIndex = mutable.indexOfFirst {
-                                it.comment_reply.comment_id == readRes.data.comment_view.comment.id
-                            }
-                            val cr = mutable[foundIndex].comment_reply
-                            val newCr = cr.copy(read = !cr.read)
-                            mutable[foundIndex] = mutable[foundIndex].copy(comment_reply = newCr)
-
-                            val newRes =
-                                ApiState.Success(existing.data.copy(replies = mutable.toList()))
-                            repliesRes = newRes
-                        }
-
-                        else -> {}
+                    val mutable = repliesRes.toMutableList()
+                    val foundIndex = mutable.indexOfFirst {
+                        it.comment_reply.comment_id == readRes.data.comment_view.comment.id
+                    }
+                    if (foundIndex != -1) {
+                        val cr = mutable[foundIndex].comment_reply
+                        val newCr = cr.copy(read = !cr.read)
+                        mutable[foundIndex] = mutable[foundIndex].copy(comment_reply = newCr)
+                        repliesRes = mutable.toList()
                     }
                 }
-
                 else -> {}
             }
         }
+        return true
     }
 
-    fun markPersonMentionAsRead(
-        form: MarkPersonMentionAsRead,
-    ) {
+    fun markPersonMentionAsRead(personMentionView: PersonMentionView): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = MarkPersonMentionAsRead(
+                person_mention_id = personMentionView.person_mention.id,
+                read = !personMentionView.person_mention.read,
+                auth = jwt,
+            )
+
             markMentionAsReadRes = ApiState.Loading
-            markMentionAsReadRes = apiWrapper(API.getInstance().markPersonMentionAsRead(form))
+            markMentionAsReadRes = apiWrapper(api.markPersonMentionAsRead(form))
 
             when (val readRes = markMentionAsReadRes) {
                 is ApiState.Success -> {
-                    when (val existing = mentionsRes) {
-                        is ApiState.Success -> {
-                            val newMentions =
-                                findAndUpdateMention(
-                                    existing.data.mentions,
-                                    readRes.data.person_mention_view,
-                                )
-                            val newRes =
-                                ApiState.Success(existing.data.copy(mentions = newMentions))
-                            mentionsRes = newRes
-                        }
-
-                        else -> {}
-                    }
+                    mentionsRes = findAndUpdateMention(
+                        mentionsRes,
+                        readRes.data.person_mention_view,
+                    )
                 }
-
                 else -> {}
             }
         }
+        return true
     }
 
-    fun markPrivateMessageAsRead(
-        form: MarkPrivateMessageAsRead,
-    ) {
+    fun markPrivateMessageAsRead(privateMessageView: PrivateMessageView): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = MarkPrivateMessageAsRead(
+                private_message_id = privateMessageView.private_message.id,
+                read = !privateMessageView.private_message.read,
+                auth = jwt,
+            )
+
             markMessageAsReadRes = ApiState.Loading
-            markMessageAsReadRes = apiWrapper(API.getInstance().markPrivateMessageAsRead(form))
+            markMessageAsReadRes = apiWrapper(api.markPrivateMessageAsRead(form))
 
             when (val readRes = markMessageAsReadRes) {
                 is ApiState.Success -> {
-                    when (val existing = messagesRes) {
-                        is ApiState.Success -> {
-                            val newMessages =
-                                findAndUpdatePrivateMessage(
-                                    existing.data.private_messages,
-                                    readRes.data.private_message_view,
-                                )
-                            val newRes =
-                                ApiState.Success(existing.data.copy(private_messages = newMessages))
-                            messagesRes = newRes
-                        }
-
-                        else -> {}
-                    }
+                    messagesRes =findAndUpdatePrivateMessage(
+                        messagesRes,
+                        readRes.data.private_message_view,
+                    )
                 }
-
                 else -> {}
             }
         }
+        return false
     }
+
     fun blockCommunity(form: BlockCommunity, ctx: Context) {
         viewModelScope.launch {
             blockCommunityRes = ApiState.Loading
-            blockCommunityRes =
-                apiWrapper(API.getInstance().blockCommunity(form))
-//            showBlockCommunityToast(blockCommunityRes, ctx)
+            blockCommunityRes = apiWrapper(api.blockCommunity(form))
         }
     }
 
-    fun blockPerson(form: BlockPerson, ctx: Context) {
+    fun blockPerson(person: Person): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = BlockPerson(
+                person_id = person.id,
+                block = true,
+                auth = jwt,
+            )
+
             blockPersonRes = ApiState.Loading
             blockPersonRes = apiWrapper(API.getInstance().blockPerson(form))
-//            showBlockPersonToast(blockPersonRes, ctx)
         }
+        return true
     }
 
-    fun markAllAsRead(
-        form: MarkAllAsRead,
-    ) {
+    fun markAllAsRead(): Boolean {
+        val jwt = account.value?.jwt ?: return false
         viewModelScope.launch {
+            val form = MarkAllAsRead(auth = jwt)
+
             markAllAsReadRes = ApiState.Loading
-            markAllAsReadRes = apiWrapper(API.getInstance().markAllAsRead(form))
+            markAllAsReadRes = apiWrapper(api.markAllAsRead(form))
 
-            when (val replies = repliesRes) {
+            when (markAllAsReadRes) {
                 is ApiState.Success -> {
-                    val mutable = replies.data.replies.toMutableList()
-                    mutable.replaceAll { it.copy(comment_reply = it.comment_reply.copy(read = true)) }
-                    repliesRes = ApiState.Success(replies.data.copy(replies = mutable.toList()))
+                    repliesRes = repliesRes.let { replies ->
+                        val mutable = replies.toMutableList()
+                        mutable.replaceAll {
+                            it.copy(comment_reply = it.comment_reply.copy(read = true))
+                        }
+                        mutable.toList()
+                    }
+
+                    mentionsRes = mentionsRes.let { mentions ->
+                        val mutable = mentions.toMutableList()
+                        mutable.replaceAll {
+                            it.copy(person_mention = it.person_mention.copy(read = true))
+                        }
+                        mutable.toList()
+                    }
+
+                    messagesRes = messagesRes.let { messages ->
+                        val mutable = messages.toMutableList()
+                        mutable.replaceAll {
+                            it.copy(private_message = it.private_message.copy(read = true))
+                        }
+                        mutable.toList()
+                    }
                 }
-
-                else -> {}
-            }
-
-            when (val mentions = mentionsRes) {
-                is ApiState.Success -> {
-                    val mutable = mentions.data.mentions.toMutableList()
-                    mutable.replaceAll { it.copy(person_mention = it.person_mention.copy(read = true)) }
-                    mentionsRes = ApiState.Success(mentions.data.copy(mentions = mutable.toList()))
-                }
-
-                else -> {}
-            }
-
-            when (val messages = messagesRes) {
-                is ApiState.Success -> {
-                    val mutable = messages.data.private_messages.toMutableList()
-                    mutable.replaceAll { it.copy(private_message = it.private_message.copy(read = true)) }
-                    messagesRes = ApiState.Success(messages.data.copy(private_messages = mutable.toList()))
-                }
-
                 else -> {}
             }
         }
+        return true
     }
 }

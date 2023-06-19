@@ -38,6 +38,7 @@ import com.jerboa.datatypes.types.SortType
 import com.jerboa.db.Account
 import com.jerboa.dedupePosts
 import com.jerboa.findAndUpdatePost
+import com.jerboa.nav.Route
 import com.jerboa.newVote
 import com.jerboa.serializeToMap
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -160,8 +161,32 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun updateFilter(filter: PostFilter) {
-        viewModelScope.launch { _filter.emit(filter) }
+    fun reload() {
+        viewModelScope.launch {
+            _filter.emit(_filter.value.copy(page = 1))
+        }
+    }
+
+    fun nextPage() {
+        viewModelScope.launch {
+            when (fetchingMore) {
+                is ApiState.Loading -> {}
+                is ApiState.Failure -> load(_filter.value, account.value?.jwt)
+                else -> _filter.emit(_filter.value.let { it.copy(page = it.page + 1) })
+            }
+        }
+    }
+
+    fun withSort(sort: SortType) {
+        viewModelScope.launch {
+            _filter.emit(_filter.value.copy(sort = sort, page = 1))
+        }
+    }
+
+    fun withType(type: ListingType) {
+        viewModelScope.launch {
+            _filter.emit(_filter.value.copy(type = type, page = 1))
+        }
     }
 
     private var likePostRes: ApiState<PostResponse> by mutableStateOf(ApiState.Empty)
@@ -183,7 +208,7 @@ class HomeViewModel @Inject constructor(
                 post_id = postView.post.id,
                 score = newVote(
                     currentVote = postView.my_vote,
-                    voteType = VoteType.Upvote,
+                    voteType = voteType,
                 ),
                 auth = jwt,
             )

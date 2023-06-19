@@ -8,7 +8,7 @@ abstract class NavControllerWrapper {
 
     val canPop by lazy {
         navController.currentBackStackEntryFlow.map {
-            it.destination.parent != null
+            it.destination.parent?.route != null
         }
     }
 

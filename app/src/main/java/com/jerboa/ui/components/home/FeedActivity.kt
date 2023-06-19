@@ -155,15 +155,9 @@ fun MainPostListingsContent(
     }
 
     val loading = homeViewModel.fetchingMore is ApiState.Loading
-    LaunchedEffect(loading) {
-        Log.d("HomeViewModel", "loading = $loading")
-    }
-
     val pullRefreshState = rememberPullRefreshState(
         refreshing = loading,
-        onRefresh = {
-            homeViewModel.updateFilter(homeViewModel.filter.value.firstPage())
-        },
+        onRefresh = homeViewModel::reload,
     )
 
     val account by homeViewModel.account.observeAsState()
@@ -230,17 +224,7 @@ fun MainPostListingsContent(
             onPersonClick = { personId ->
                 navController.toProfile.navigate(personId)
             },
-            isScrolledToEnd = {
-                when (homeViewModel.fetchingMore) {
-                    is ApiState.Loading -> {}
-                    is ApiState.Failure -> homeViewModel.updateFilter(
-                        homeViewModel.filter.value
-                    )
-                    else -> homeViewModel.updateFilter(
-                        homeViewModel.filter.value.nextPage()
-                    )
-                }
-            },
+            isScrolledToEnd = homeViewModel::nextPage,
             account = account,
             enableDownVotes = siteRes.enableDownvotes(),
             showAvatar = siteRes.showAvatar(),
@@ -258,8 +242,6 @@ fun MainDrawer(
     drawerState: DrawerState,
 ) {
     val accountViewModel: AccountViewModel = hiltViewModel()
-
-    val accounts = accountViewModel.allAccounts.observeAsState()
     val account = getCurrentAccount(accountViewModel)
 
     val scope = rememberCoroutineScope()
@@ -280,7 +262,7 @@ fun MainDrawer(
             closeDrawer(scope, drawerState)
         },
         onClickListingType = { listingType ->
-            homeViewModel.updateFilter(homeViewModel.filter.value.withType(listingType))
+            homeViewModel.withType(listingType)
             closeDrawer(scope, drawerState)
         },
         onCommunityClick = { community ->
@@ -342,18 +324,18 @@ fun MainTopBar(
             selectedPostViewMode = appSettings.postViewMode(),
             onClickSortType = { sortType ->
                 scrollToTop(scope, postListState)
-                homeViewModel.updateFilter(filter.withSort(sortType))
+                homeViewModel.withSort(sortType)
             },
             onClickListingType = { listingType ->
                 scrollToTop(scope, postListState)
-                homeViewModel.updateFilter(filter.withType(listingType))
+                homeViewModel.withType(listingType)
             },
             onClickPostViewMode = {
                 appSettingsViewModel.updatedPostViewMode(it.ordinal)
             },
             onClickRefresh = {
                 scrollToTop(scope, postListState)
-                homeViewModel.updateFilter(filter.firstPage())
+                homeViewModel.reload()
             },
             onClickShowSiteInfo = { navController.toSiteSideBar.navigate() }
         )

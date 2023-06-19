@@ -93,6 +93,7 @@ val DEFAULT_LEMMY_INSTANCES = listOf(
     "slrpnk.net",
     "sopuli.xyz",
     "szmer.info",
+    "voyager.lemmy.ml", // TODO remove
 )
 
 // convert a data class to a map
@@ -1007,6 +1008,15 @@ fun CommunityBlockedSnackbarEffect(
                 )
             }
             else -> {}
+        }
+    }
+}
+
+@Composable
+fun<T> ApiSuccessEffect(apiState: ApiState<T>, block: suspend CoroutineScope.() -> Unit) {
+    LaunchedEffect(apiState) {
+        if (apiState is ApiState.Success) {
+            this.block()
         }
     }
 }

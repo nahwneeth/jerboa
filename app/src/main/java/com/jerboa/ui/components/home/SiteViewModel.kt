@@ -33,7 +33,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SiteViewModel @Inject constructor(
-    private val api: API,
+    // do NOT inject API here. This is where instance is set and API depends on it.
     private val account: LiveData<Account?>,
     private val hostInfo: HostInfo,
     private val accountRepository: AccountRepository,
@@ -54,17 +54,18 @@ class SiteViewModel @Inject constructor(
         }
     }
 
-    fun getSite(
-        form: GetSite,
-    ) {
+    fun getSite(form: GetSite) {
         viewModelScope.launch {
             siteRes = ApiState.Loading
-            siteRes = apiWrapper(api.getSite(form.serializeToMap()))
+            siteRes = apiWrapper(API.getInstance().getSite(form.serializeToMap()))
         }
     }
 
     private suspend fun updateAccount(account: Account?, luv: LocalUserView?) {
         if (account == null || luv == null) return;
+        Log.d("updateAccount", "account.name=${account.name}; luv.name=${luv.person.name}")
+        Log.d("updateAccount", "account.name=${account.defaultListingType}; luv.name=${luv.local_user.default_listing_type.ordinal}")
+        Log.d("updateAccount", "account.name=${account.defaultSortType}; luv.name=${luv.local_user.default_sort_type.ordinal}")
 
         val needsUpdate = account.name == luv.person.name ||
             account.defaultListingType == luv.local_user.default_listing_type.ordinal ||
@@ -90,20 +91,28 @@ class SiteViewModel @Inject constructor(
 
         if (account != null) {
             hostInfo.instance = account.instance
+        } else {
+            hostInfo.instance = HostInfo.DEFAULT_INSTANCE
         }
 
         siteRes = ApiState.Loading
-        siteRes = try {
+        val api = hostInfo.api
+
+        val response = try {
             apiWrapper(api.getSite(GetSite(auth = account?.jwt).serializeToMap()))
         } catch (e: Exception) {
             Log.e("SiteViewModel", e.toString())
             ApiState.Failure(e)
         }
 
-        when (val res = siteRes) {
-            is ApiState.Success -> updateAccount(account, res.data.my_user?.local_user_view)
+        when (response) {
+            is ApiState.Success -> {
+                updateAccount(account, response.data.my_user?.local_user_view)
+            }
             else -> {}
         }
+
+        siteRes = response
     }
 
     fun reload() = viewModelScope.launch {

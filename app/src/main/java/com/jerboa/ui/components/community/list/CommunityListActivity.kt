@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -14,9 +15,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jerboa.DEBOUNCE_DELAY
 import com.jerboa.api.ApiState
+import com.jerboa.datatypes.types.GetSiteResponse
 import com.jerboa.datatypes.types.Search
 import com.jerboa.datatypes.types.SearchType
 import com.jerboa.datatypes.types.SortType
@@ -32,28 +35,17 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private var fetchCommunitiesJob: Job? = null
-
 @Composable
 fun CommunityListActivity(
     navController: CommunityListNavController,
-    accountViewModel: AccountViewModel,
-    siteViewModel: SiteViewModel,
+    followedCommunitiesViewModel: FollowedCommunitiesViewModel,
     onSelectCommunity: OnSelectCommunity?
 ) {
     Log.d("jerboa", "got to community list activity")
 
-    val account = getCurrentAccount(accountViewModel = accountViewModel)
-
-    var search by rememberSaveable { mutableStateOf("") }
-
-    val scope = rememberCoroutineScope()
-    val ctx = LocalContext.current
-
-    val communityListViewModel: CommunityListViewModel = viewModel()
-    initializeOnce(communityListViewModel) {
-        // Whenever navigating here, reset the list with your followed communities
-        communityListViewModel.setCommunityListFromFollowed(siteViewModel)
+    val communityListViewModel: CommunityListViewModel = hiltViewModel()
+    LaunchedEffect(followedCommunitiesViewModel) {
+        communityListViewModel.followedCommunitiesViewModel = followedCommunitiesViewModel
     }
 
     Surface(color = MaterialTheme.colorScheme.background) {
@@ -61,22 +53,7 @@ fun CommunityListActivity(
             topBar = {
                 CommunityListHeader(
                     navController = navController,
-                    search = search,
-                    onSearchChange = {
-                        search = it
-                        fetchCommunitiesJob?.cancel()
-                        fetchCommunitiesJob = scope.launch {
-                            delay(DEBOUNCE_DELAY)
-                            communityListViewModel.searchCommunities(
-                                form = Search(
-                                    q = search,
-                                    type_ = SearchType.Communities,
-                                    sort = SortType.TopAll,
-                                    auth = account?.jwt,
-                                ),
-                            )
-                        }
-                    },
+                    searchFlow = communityListViewModel.searchFlow,
                 )
             },
             content = { padding ->
