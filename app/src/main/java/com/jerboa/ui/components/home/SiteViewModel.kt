@@ -19,6 +19,7 @@ import com.jerboa.datatypes.types.GetUnreadCount
 import com.jerboa.datatypes.types.GetUnreadCountResponse
 import com.jerboa.datatypes.types.LocalUserView
 import com.jerboa.datatypes.types.MyUserInfo
+import com.jerboa.datatypes.types.SiteResponse
 import com.jerboa.db.Account
 import com.jerboa.db.AccountRepository
 import com.jerboa.serializeToMap
@@ -39,8 +40,6 @@ class SiteViewModel @Inject constructor(
 ) : ViewModel() {
     var siteRes: ApiState<GetSiteResponse> by mutableStateOf(ApiState.Empty)
         private set
-
-    private var unreadCountRes: ApiState<GetUnreadCountResponse> by mutableStateOf(ApiState.Empty)
 
     init {
         viewModelScope.launch {
@@ -105,48 +104,33 @@ class SiteViewModel @Inject constructor(
             is ApiState.Success -> updateAccount(account, res.data.my_user?.local_user_view)
             else -> {}
         }
-
-        loadUnreadCounts(account)
     }
 
     fun reload() = viewModelScope.launch {
         load(account.value)
     }
 
-    private suspend fun loadUnreadCounts(account: Account?) {
-        if (account != null) {
-            unreadCountRes = ApiState.Loading
-            unreadCountRes = apiWrapper(
-                api.getUnreadCount(
-                    GetUnreadCount(auth = account.jwt).serializeToMap()
-                )
-            )
-        } else {
-            unreadCountRes = ApiState.Empty
-        }
-    }
-
-    fun fetchUnreadCounts(
-        form: GetUnreadCount,
-    ) {
-        viewModelScope.launch {
-            viewModelScope.launch {
-                unreadCountRes = ApiState.Loading
-                unreadCountRes = apiWrapper(API.getInstance().getUnreadCount(form.serializeToMap()))
-            }
-        }
-    }
-
-    fun getUnreadCountTotal(): Int {
-        return when (val res = unreadCountRes) {
-            is ApiState.Success -> {
-                val unreads = res.data
-                unreads.mentions + unreads.private_messages + unreads.replies
-            }
-
-            else -> 0
-        }
-    }
+//    fun fetchUnreadCounts(
+//        form: GetUnreadCount,
+//    ) {
+//        viewModelScope.launch {
+//            viewModelScope.launch {
+//                unreadCountRes = ApiState.Loading
+//                unreadCountRes = apiWrapper(API.getInstance().getUnreadCount(form.serializeToMap()))
+//            }
+//        }
+//    }
+//
+//    fun getUnreadCountTotal(): Int {
+//        return when (val res = unreadCountRes) {
+//            is ApiState.Success -> {
+//                val unreads = res.data
+//                unreads.mentions + unreads.private_messages + unreads.replies
+//            }
+//
+//            else -> 0
+//        }
+//    }
 
     fun showAvatar(): Boolean {
         return when (val res = siteRes) {
@@ -164,3 +148,7 @@ class SiteViewModel @Inject constructor(
         }
     }
 }
+
+fun GetSiteResponse.showAvatar() = my_user?.local_user_view?.local_user?.show_avatars ?: true
+
+fun GetSiteResponse.enableDownvotes() = site_view.local_site.enable_downvotes

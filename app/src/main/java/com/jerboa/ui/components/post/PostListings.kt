@@ -1,5 +1,6 @@
 package com.jerboa.ui.components.post
 
+import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -51,6 +52,10 @@ fun PostListings(
     enableDownVotes: Boolean,
     showAvatar: Boolean,
 ) {
+    LaunchedEffect(posts) {
+        Log.d("HomeViewModel", "posts.size = ${posts.size}")
+    }
+
     LazyColumn(
         state = listState,
         modifier = Modifier

@@ -30,8 +30,6 @@ import com.jerboa.dedupePosts
 import com.jerboa.findAndUpdatePost
 import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
-import com.jerboa.showBlockCommunityToast
-import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
 class CommunityViewModel : ViewModel(), Initializable {
@@ -198,7 +196,7 @@ class CommunityViewModel : ViewModel(), Initializable {
 
             when (val blockCommunity = blockCommunityRes) {
                 is ApiState.Success -> {
-                    showBlockCommunityToast(blockCommunity, ctx)
+//                    showBlockCommunityToast(blockCommunity, ctx)
 
                     when (val existing = communityRes) {
                         is ApiState.Success -> {
@@ -225,7 +223,7 @@ class CommunityViewModel : ViewModel(), Initializable {
         viewModelScope.launch {
             blockPersonRes = ApiState.Loading
             blockPersonRes = apiWrapper(API.getInstance().blockPerson(form))
-            showBlockPersonToast(blockPersonRes, ctx)
+//            showBlockPersonToast(blockPersonRes, ctx)
         }
     }
 

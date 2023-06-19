@@ -19,7 +19,11 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TabPosition
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -114,9 +118,9 @@ fun toastException(ctx: Context, error: Exception) {
 }
 
 // TODO also navigate to login page
-fun loginFirstToast(ctx: Context) {
-    Toast.makeText(ctx, ctx.getString(R.string.utils_login_first), Toast.LENGTH_SHORT).show()
-}
+//fun loginFirstToast(ctx: Context) {
+//    Toast.makeText(ctx, ctx.getString(R.string.utils_login_first), Toast.LENGTH_SHORT).show()
+//}
 
 enum class VoteType {
     Upvote,
@@ -725,41 +729,6 @@ fun siFormat(num: Int): String {
     }
 }
 
-fun fetchInitialData(
-    account: Account?,
-    siteViewModel: SiteViewModel,
-    homeViewModel: HomeViewModel,
-) {
-    if (account != null) {
-        API.changeLemmyInstance(account.instance)
-        homeViewModel.resetPage()
-        homeViewModel.getPosts(
-            GetPosts(
-                type_ = ListingType.values()[account.defaultListingType],
-                sort = SortType.values()[account.defaultSortType],
-                auth = account.jwt,
-            ),
-        )
-//        siteViewModel.fetchUnreadCounts(GetUnreadCount(auth = account.jwt))
-    } else {
-        Log.d("jerboa", "Fetching posts for anonymous user")
-        API.changeLemmyInstance(DEFAULT_INSTANCE)
-        homeViewModel.resetPage()
-        homeViewModel.getPosts(
-            GetPosts(
-                type_ = ListingType.Local,
-                sort = SortType.Active,
-            ),
-        )
-    }
-
-//    siteViewModel.getSite(
-//        GetSite(
-//            auth = account?.jwt,
-//        ),
-//    )
-}
-
 fun imageInputStreamFromUri(ctx: Context, uri: Uri): InputStream {
     return ctx.contentResolver.openInputStream(uri)!!
 }
@@ -1006,33 +975,39 @@ fun findAndUpdatePrivateMessage(
     }
 }
 
-fun showBlockPersonToast(blockPersonRes: ApiState<BlockPersonResponse>, ctx: Context) {
-    when (blockPersonRes) {
-        is ApiState.Success -> {
-            Toast.makeText(
-                ctx,
-                "${blockPersonRes.data.person_view.person.name} Blocked",
-                Toast.LENGTH_SHORT,
-            )
-                .show()
+@Composable
+fun PersonBlockedSnackbarEffect(
+    blockPersonRes: ApiState<BlockPersonResponse>,
+    snackbarHostState: SnackbarHostState,
+) {
+    LaunchedEffect(blockPersonRes) {
+        when (blockPersonRes) {
+            is ApiState.Success -> {
+                snackbarHostState.showSnackbar(
+                    message = "${blockPersonRes.data.person_view.person.name} blocked",
+                    duration = SnackbarDuration.Short,
+                )
+            }
+            else -> {}
         }
-
-        else -> {}
     }
 }
 
-fun showBlockCommunityToast(blockCommunityRes: ApiState<BlockCommunityResponse>, ctx: Context) {
-    when (blockCommunityRes) {
-        is ApiState.Success -> {
-            Toast.makeText(
-                ctx,
-                "${blockCommunityRes.data.community_view.community.name} Blocked",
-                Toast.LENGTH_SHORT,
-            )
-                .show()
+@Composable
+fun CommunityBlockedSnackbarEffect(
+    blockCommunityRes: ApiState<BlockCommunityResponse>,
+    snackbarHostState: SnackbarHostState,
+) {
+    LaunchedEffect(blockCommunityRes) {
+        when (blockCommunityRes) {
+            is ApiState.Success -> {
+                snackbarHostState.showSnackbar(
+                    message = "${blockCommunityRes.data.community_view.community.name} Blocked",
+                    duration = SnackbarDuration.Short,
+                )
+            }
+            else -> {}
         }
-
-        else -> {}
     }
 }
 

@@ -47,7 +47,6 @@ import com.jerboa.datatypes.types.SavePost
 import com.jerboa.datatypes.types.SubscribedType
 import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
-import com.jerboa.loginFirstToast
 import com.jerboa.nav.initializeOnce
 import com.jerboa.newVote
 import com.jerboa.scrollToTop

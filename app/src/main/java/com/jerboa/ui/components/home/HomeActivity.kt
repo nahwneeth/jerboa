@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,15 +42,20 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import arrow.core.Either
+import com.jerboa.CommunityBlockedSnackbarEffect
+import com.jerboa.PersonBlockedSnackbarEffect
 import com.jerboa.R
+import com.jerboa.api.ApiState
+import com.jerboa.datatypes.types.GetSiteResponse
+import com.jerboa.datatypes.types.GetUnreadCountResponse
 import com.jerboa.db.AccountViewModel
 import com.jerboa.db.AppSettingsViewModel
-import com.jerboa.fetchInitialData
 import com.jerboa.ui.components.common.InboxIconAndBadge
 import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.community.list.CommunityListActivity
@@ -63,8 +69,7 @@ import com.jerboa.ui.components.person.PersonProfileNavController
 @Composable
 fun HomeActivity(
     selectTabArg: HomeTab,
-    accountViewModel: AccountViewModel,
-    siteViewModel: SiteViewModel,
+    siteRes: GetSiteResponse,
     appSettingsViewModel: AppSettingsViewModel,
     feedNavController: FeedNavController,
     communityListNavController: CommunityListNavController,
@@ -73,17 +78,20 @@ fun HomeActivity(
 ) {
     Log.d("jerboa", "got to home activity")
 
-    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val ctx = LocalContext.current
-    val account = getCurrentAccount(accountViewModel)
 
-    val homeViewModel: HomeViewModel = viewModel()
-    if (!homeViewModel.initialized) {
-        fetchInitialData(account, siteViewModel, homeViewModel)
-        homeViewModel.initialized = true
+    val homeViewModel: HomeViewModel = hiltViewModel()
+    CommunityBlockedSnackbarEffect(homeViewModel.blockCommunityRes, snackbarHostState)
+    PersonBlockedSnackbarEffect(homeViewModel.blockPersonRes, snackbarHostState)
+    LaunchedEffect(homeViewModel.unreadCountRes) {
+        when (homeViewModel.unreadCountRes) {
+            is ApiState.Failure -> homeViewModel.reloadUnreadCounts()
+            else -> {}
+        }
     }
+
+    val account by homeViewModel.account.observeAsState()
 
     val bottomNavController = rememberNavController()
     var selectedTab by rememberSaveable { mutableStateOf(HomeTab.Feed) }
@@ -109,12 +117,9 @@ fun HomeActivity(
             ModalDrawerSheet(
                 content = {
                     MainDrawer(
-                        siteViewModel = siteViewModel,
-                        accountViewModel = accountViewModel,
+                        siteRes = siteRes,
                         homeViewModel = homeViewModel,
-                        scope = scope,
                         drawerState = drawerState,
-                        ctx = ctx,
                         navController = feedNavController,
                         bottomNavController = BottomNavController(
                             toFeed = BottomNavigation { onSelectTab(HomeTab.Feed) },
@@ -138,8 +143,8 @@ fun HomeActivity(
                     ) {
                         composable(HomeTab.Feed.name) {
                             FeedActivity(
-                                accountViewModel = accountViewModel,
-                                siteViewModel = siteViewModel,
+                                homeViewModel = homeViewModel,
+                                siteRes = siteRes,
                                 appSettingsViewModel = appSettingsViewModel,
                                 drawerState = drawerState,
                                 navController = feedNavController,
@@ -148,8 +153,8 @@ fun HomeActivity(
 
                         composable(HomeTab.Search.name) {
                             CommunityListActivity(
-                                accountViewModel = accountViewModel,
-                                siteViewModel = siteViewModel,
+                                accountViewModel = hiltViewModel(),
+                                siteViewModel = hiltViewModel(),
                                 onSelectCommunity = null,
                                 navController = communityListNavController,
                             )
@@ -157,8 +162,8 @@ fun HomeActivity(
 
                         composable(HomeTab.Inbox.name) {
                             InboxActivity(
-                                accountViewModel = accountViewModel,
-                                siteViewModel = siteViewModel,
+                                accountViewModel = hiltViewModel(),
+                                siteViewModel = hiltViewModel(),
                                 navController = inboxNavController,
                             )
                         }
@@ -167,8 +172,8 @@ fun HomeActivity(
                             PersonProfileActivity(
                                 personArg = Either.Left(account!!.id),
                                 savedMode = true,
-                                accountViewModel = accountViewModel,
-                                siteViewModel = siteViewModel,
+                                accountViewModel = hiltViewModel(),
+                                siteViewModel = hiltViewModel(),
                                 appSettingsViewModel = appSettingsViewModel,
                                 navController = savedAndProfileNavController,
                             )
@@ -178,8 +183,8 @@ fun HomeActivity(
                             PersonProfileActivity(
                                 personArg = Either.Left(account!!.id),
                                 savedMode = false,
-                                accountViewModel = accountViewModel,
-                                siteViewModel = siteViewModel,
+                                accountViewModel = hiltViewModel(),
+                                siteViewModel = hiltViewModel(),
                                 appSettingsViewModel = appSettingsViewModel,
                                 navController = savedAndProfileNavController,
                             )
@@ -190,7 +195,7 @@ fun HomeActivity(
                     BottomNavBar(
                         showBottomNav = appSettingsViewModel.appSettings.value?.showBottomNav,
                         selectedTab = selectedTab,
-                        unreadCounts = siteViewModel.getUnreadCountTotal(),
+                        unreadCounts = homeViewModel.unreadCountRes.totalUnreadCount(),
                         onSelect = onSelectTab,
                     )
                 },
@@ -209,7 +214,7 @@ enum class HomeTab {
 fun BottomNavBar(
     selectedTab: HomeTab,
     onSelect: (HomeTab) -> Unit,
-    unreadCounts: Int,
+    unreadCounts: Int?,
     showBottomNav: Boolean? = true,
 ) {
     if (showBottomNav == true) {
@@ -283,5 +288,12 @@ fun BottomNavBar(
                 )
             }
         }
+    }
+}
+
+fun ApiState<GetUnreadCountResponse>.totalUnreadCount(): Int? {
+    return when(this) {
+        is ApiState.Success -> data.mentions + data.replies + data.private_messages
+        else -> null
     }
 }

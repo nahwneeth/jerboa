@@ -6,6 +6,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import com.jerboa.PostViewMode
 import com.jerboa.db.Account
 import com.jerboa.db.AccountViewModel
+import com.jerboa.db.AppSettings
 import com.jerboa.db.AppSettingsViewModel
 
 @Composable
@@ -26,3 +27,5 @@ fun getCurrentAccount(accounts: List<Account>?): Account? {
 fun getPostViewMode(appSettingsViewModel: AppSettingsViewModel): PostViewMode {
     return PostViewMode.values()[appSettingsViewModel.appSettings.value?.postViewMode ?: 0]
 }
+
+fun AppSettings?.postViewMode() = PostViewMode.values()[this?.postViewMode ?: 0]

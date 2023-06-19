@@ -45,7 +45,6 @@ import com.jerboa.datatypes.samplePerson
 import com.jerboa.datatypes.samplePost
 import com.jerboa.datatypes.types.Person
 import com.jerboa.db.Account
-import com.jerboa.loginFirstToast
 import com.jerboa.nav.NavControllerWrapper
 import com.jerboa.siFormat
 import com.jerboa.ui.components.person.PersonProfileLink
@@ -320,11 +319,7 @@ fun ActionBarButton(
         Modifier
     } else {
         Modifier.clickable(onClick = {
-            if (!requiresAccount || account !== null) {
-                onClick()
-            } else {
-                loginFirstToast(ctx)
-            }
+            onClick()
         })
     }
     Row(

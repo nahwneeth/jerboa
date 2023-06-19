@@ -74,7 +74,7 @@ fun InboxActivity(
     val account = getCurrentAccount(accountViewModel)
     Log.d("understand recompose", "account: ${account?.name ?: "null"}")
 
-    val unreadCount = siteViewModel.getUnreadCountTotal()
+    val unreadCount = 0 /*siteViewModel.getUnreadCountTotal()*/
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
 
     val inboxViewModel: InboxViewModel = viewModel()
@@ -149,11 +149,11 @@ fun InboxActivity(
                         )
                         // TODO test this
                         // Update site counts
-                        siteViewModel.fetchUnreadCounts(
-                            GetUnreadCount(
-                                auth = acct.jwt,
-                            ),
-                        )
+//                        siteViewModel.fetchUnreadCounts(
+//                            GetUnreadCount(
+//                                auth = acct.jwt,
+//                            ),
+//                        )
                     }
                 },
             )
@@ -346,11 +346,11 @@ fun InboxTabs(
                                                             auth = acct.jwt,
                                                         ),
                                                     )
-                                                    siteViewModel.fetchUnreadCounts(
-                                                        GetUnreadCount(
-                                                            auth = acct.jwt,
-                                                        ),
-                                                    )
+//                                                    siteViewModel.fetchUnreadCounts(
+//                                                        GetUnreadCount(
+//                                                            auth = acct.jwt,
+//                                                        ),
+//                                                    )
                                                 }
                                             },
                                             onReportClick = { cv ->
@@ -516,11 +516,11 @@ fun InboxTabs(
                                                             auth = acct.jwt,
                                                         ),
                                                     )
-                                                    siteViewModel.fetchUnreadCounts(
-                                                        GetUnreadCount(
-                                                            auth = acct.jwt,
-                                                        ),
-                                                    )
+//                                                    siteViewModel.fetchUnreadCounts(
+//                                                        GetUnreadCount(
+//                                                            auth = acct.jwt,
+//                                                        ),
+//                                                    )
                                                 }
                                             },
                                             onReportClick = { pm ->
@@ -648,11 +648,11 @@ fun InboxTabs(
                                                             auth = acct.jwt,
                                                         ),
                                                     )
-                                                    siteViewModel.fetchUnreadCounts(
-                                                        GetUnreadCount(
-                                                            auth = acct.jwt,
-                                                        ),
-                                                    )
+//                                                    siteViewModel.fetchUnreadCounts(
+//                                                        GetUnreadCount(
+//                                                            auth = acct.jwt,
+//                                                        ),
+//                                                    )
                                                 },
                                                 onPersonClick = { personId ->
                                                     navController.toProfile.navigate(personId)

@@ -103,8 +103,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun Drawer(
-    siteRes: ApiState<GetSiteResponse>,
-    unreadCount: Int,
+    siteRes: GetSiteResponse,
+    unreadCount: Int?,
     accountViewModel: AccountViewModel,
     onAddAccountClick: () -> Unit,
     onSwitchAccountClick: (account: Account) -> Unit,
@@ -122,10 +122,7 @@ fun Drawer(
 
     if (!isOpen) showAccountAddMode = false
 
-    val myUserInfo = when (siteRes) {
-        is ApiState.Success -> siteRes.data.my_user
-        else -> null
-    }
+    val myUserInfo = siteRes.my_user
 
     DrawerHeader(
         myPerson = myUserInfo?.local_user_view?.person,
@@ -168,7 +165,7 @@ fun DrawerContent(
     onClickSettings: () -> Unit,
     onClickCommunities: () -> Unit,
     myUserInfo: MyUserInfo?,
-    unreadCount: Int,
+    unreadCount: Int?,
 ) {
     AnimatedVisibility(
         visible = showAccountAddMode,
@@ -208,7 +205,7 @@ fun DrawerItemsMain(
     onClickCommunities: () -> Unit,
     onClickListingType: (ListingType) -> Unit,
     onCommunityClick: (community: Community) -> Unit,
-    unreadCount: Int,
+    unreadCount: Int?,
 ) {
     val listState = rememberLazyListState()
 
@@ -469,7 +466,6 @@ fun HomeHeaderTitle(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeHeader(
-    scope: CoroutineScope,
     drawerState: DrawerState,
     onClickSortType: (SortType) -> Unit,
     onClickListingType: (ListingType) -> Unit,
@@ -555,6 +551,7 @@ fun HomeHeader(
             )
         },
         navigationIcon = {
+            val scope = rememberCoroutineScope()
             IconButton(onClick = {
                 scope.launch {
                     drawerState.open()
@@ -603,7 +600,6 @@ fun HomeHeaderPreview() {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     HomeHeader(
-        scope,
         drawerState,
         onClickSortType = {},
         onClickListingType = {},

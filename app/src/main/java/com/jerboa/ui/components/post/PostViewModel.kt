@@ -44,8 +44,6 @@ import com.jerboa.db.Account
 import com.jerboa.findAndUpdateComment
 import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
-import com.jerboa.showBlockCommunityToast
-import com.jerboa.showBlockPersonToast
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -295,7 +293,7 @@ class PostViewModel @Inject constructor(
             blockCommunityRes = ApiState.Loading
             blockCommunityRes =
                 apiWrapper(API.getInstance().blockCommunity(form))
-            showBlockCommunityToast(blockCommunityRes, ctx)
+//            showBlockCommunityToast(blockCommunityRes, ctx)
         }
     }
 
@@ -303,7 +301,7 @@ class PostViewModel @Inject constructor(
         viewModelScope.launch {
             blockPersonRes = ApiState.Loading
             blockPersonRes = apiWrapper(API.getInstance().blockPerson(form))
-            showBlockPersonToast(blockPersonRes, ctx)
+//            showBlockPersonToast(blockPersonRes, ctx)
         }
     }
 

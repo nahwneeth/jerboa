@@ -30,8 +30,6 @@ import com.jerboa.findAndUpdateComment
 import com.jerboa.findAndUpdatePost
 import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
-import com.jerboa.showBlockCommunityToast
-import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
 class PersonProfileViewModel : ViewModel(), Initializable {
@@ -182,7 +180,7 @@ class PersonProfileViewModel : ViewModel(), Initializable {
             blockCommunityRes = ApiState.Loading
             blockCommunityRes =
                 apiWrapper(API.getInstance().blockCommunity(form))
-            showBlockCommunityToast(blockCommunityRes, ctx)
+//            showBlockCommunityToast(blockCommunityRes, ctx)
         }
     }
 
@@ -190,7 +188,7 @@ class PersonProfileViewModel : ViewModel(), Initializable {
         viewModelScope.launch {
             blockPersonRes = ApiState.Loading
             blockPersonRes = apiWrapper(API.getInstance().blockPerson(form))
-            showBlockPersonToast(blockPersonRes, ctx)
+//            showBlockPersonToast(blockPersonRes, ctx)
         }
     }
 

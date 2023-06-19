@@ -34,8 +34,6 @@ import com.jerboa.findAndUpdatePersonMention
 import com.jerboa.findAndUpdatePrivateMessage
 import com.jerboa.nav.Initializable
 import com.jerboa.serializeToMap
-import com.jerboa.showBlockCommunityToast
-import com.jerboa.showBlockPersonToast
 import kotlinx.coroutines.launch
 
 class InboxViewModel : ViewModel(), Initializable {
@@ -438,7 +436,7 @@ class InboxViewModel : ViewModel(), Initializable {
             blockCommunityRes = ApiState.Loading
             blockCommunityRes =
                 apiWrapper(API.getInstance().blockCommunity(form))
-            showBlockCommunityToast(blockCommunityRes, ctx)
+//            showBlockCommunityToast(blockCommunityRes, ctx)
         }
     }
 
@@ -446,7 +444,7 @@ class InboxViewModel : ViewModel(), Initializable {
         viewModelScope.launch {
             blockPersonRes = ApiState.Loading
             blockPersonRes = apiWrapper(API.getInstance().blockPerson(form))
-            showBlockPersonToast(blockPersonRes, ctx)
+//            showBlockPersonToast(blockPersonRes, ctx)
         }
     }
 

@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
                     is ApiState.Success -> AppContent(
                         accountViewModel = hiltViewModel(),
                         appSettingsViewModel = appSettingsViewModel,
-                        siteResponse = siteResponse.data,
+                        siteRes = siteResponse.data,
                     )
                     else -> SiteLoader(siteViewModel = siteViewModel)
                 }
@@ -133,7 +133,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun AppContent(
-    siteResponse: GetSiteResponse,
+    siteRes: GetSiteResponse,
     accountViewModel: AccountViewModel,
     appSettingsViewModel: AppSettingsViewModel
 ) {
@@ -190,8 +190,7 @@ fun AppContent(
         ) {
             val args = Route.HomeArgs(it)
             HomeActivity(
-                accountViewModel = accountViewModel,
-                siteViewModel = hiltViewModel(),
+                siteRes = siteRes,
                 appSettingsViewModel = appSettingsViewModel,
                 selectTabArg = args.tab,
                 feedNavController = FeedNavController(
