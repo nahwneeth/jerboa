@@ -4,10 +4,14 @@ package com.jerboa.ui.components.login
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -27,6 +31,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -36,6 +41,9 @@ import com.jerboa.R
 import com.jerboa.datatypes.types.Login
 import com.jerboa.db.Account
 import com.jerboa.onAutofill
+import com.jerboa.ui.components.common.DefaultBackButton
+import com.jerboa.ui.theme.LARGE_PADDING
+import com.jerboa.ui.theme.MEDIUM_PADDING
 
 @Composable
 fun MyTextField(
@@ -98,6 +106,7 @@ fun LoginForm(
     modifier: Modifier = Modifier,
     loading: Boolean = false,
     onClickLogin: (form: Login, instance: String) -> Unit = { _: Login, _: String -> },
+    error: String? = null,
 ) {
     var instance by rememberSaveable { mutableStateOf("") }
     var username by rememberSaveable { mutableStateOf("") }
@@ -123,6 +132,23 @@ fun LoginForm(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        error?.let {
+            Box(modifier = Modifier.padding(LARGE_PADDING)) {
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = OutlinedTextFieldDefaults.MinWidth)
+                        .background(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .padding(MEDIUM_PADDING),
+                )
+            }
+        }
+
         ExposedDropdownMenuBox(
             expanded = expanded,
             onExpandedChange = {
@@ -216,34 +242,19 @@ fun LoginFormPreview() {
 }
 
 @Composable
-fun LoginHeader(
-    navController: NavController = rememberNavController(),
-    accounts: List<Account>? = null,
-) {
+fun LoginHeader(navController: NavController) {
     TopAppBar(
         title = {
             Text(
                 text = stringResource(R.string.login_login),
             )
         },
-        navigationIcon = {
-            IconButton(
-                enabled = !accounts.isNullOrEmpty(),
-                onClick = {
-                    navController.popBackStack()
-                },
-            ) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.login_back),
-                )
-            }
-        },
+        navigationIcon = { DefaultBackButton(navController) },
     )
 }
 
 @Preview
 @Composable
 fun LoginHeaderPreview() {
-    LoginHeader()
+    LoginHeader(rememberNavController())
 }

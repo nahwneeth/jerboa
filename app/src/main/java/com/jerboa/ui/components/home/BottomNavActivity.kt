@@ -40,6 +40,8 @@ import com.jerboa.ui.components.common.getCurrentAccount
 import com.jerboa.ui.components.community.list.CommunityListActivity
 import com.jerboa.ui.components.inbox.InboxActivity
 import com.jerboa.ui.components.person.PersonProfileActivity
+import com.jerboa.ui.components.settings.account.defaultListingType
+import com.jerboa.ui.components.settings.account.defaultSortType
 
 enum class BottomNavTab {
     Home, Search, Inbox, Saved, Profile;
@@ -83,8 +85,8 @@ fun BottomNavActivity(
     val homeViewModel: HomeViewModel = viewModel()
     if (siteViewModel.siteRes is ApiState.Success) {
         InitializeRoute(homeViewModel) {
-            homeViewModel.updateSortType(siteViewModel.sortType)
-            homeViewModel.updateListingType(siteViewModel.listingType)
+            homeViewModel.updateSortType(account.defaultSortType())
+            homeViewModel.updateListingType(account.defaultListingType())
             fetchHomePosts(account, homeViewModel)
         }
     }

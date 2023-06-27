@@ -10,15 +10,20 @@ import com.jerboa.api.API
 import com.jerboa.api.ApiState
 import com.jerboa.api.apiWrapper
 import com.jerboa.datatypes.types.GetSite
+import com.jerboa.datatypes.types.ListingType
 import com.jerboa.datatypes.types.LoginResponse
 import com.jerboa.datatypes.types.SaveUserSettings
+import com.jerboa.datatypes.types.SortType
 import com.jerboa.db.Account
 import com.jerboa.db.AccountRepository
 import com.jerboa.ui.components.home.SiteViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class AccountSettingsViewModel(
+@HiltViewModel
+class AccountSettingsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
 ) : ViewModel() {
     var saveUserSettingsRes: ApiState<LoginResponse> by mutableStateOf(ApiState.Empty)
@@ -37,9 +42,9 @@ class AccountSettingsViewModel(
                 GetSite(auth = account.jwt),
             )
 
-            val newAccount = async { maybeUpdateAccountSettings(account, form) }.await()
+//            val newAccount = async { maybeUpdateAccountSettings(account, form) }.await()
 
-            siteViewModel.updateFromAccount(newAccount)
+//            siteViewModel.updateFromAccount(newAccount)
         }
     }
 
@@ -55,14 +60,11 @@ class AccountSettingsViewModel(
         return newAccount
     }
 }
-class AccountSettingsViewModelFactory(
-    private val repository: AccountRepository,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(AccountSettingsViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return AccountSettingsViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
+
+fun Account?.defaultSortType(): SortType {
+    return this?.defaultSortType?.let(SortType.values()::getOrNull) ?: SortType.Active
+}
+
+fun Account?.defaultListingType(): ListingType {
+    return this?.defaultSortType?.let(ListingType.values()::getOrNull) ?: ListingType.Local
 }

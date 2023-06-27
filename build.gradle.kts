@@ -16,6 +16,7 @@ plugins {
     id("com.google.devtools.ksp") version "1.8.21-1.0.11" apply false
     id( "com.android.test") version "8.0.2" apply false
     id( "androidx.baselineprofile") version "1.2.0-alpha13" apply false
+    id("com.google.dagger.hilt.android") version "2.44" apply false
 }
 
 subprojects {

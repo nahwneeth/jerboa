@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.Executors
+import javax.inject.Inject
 
 const val DEFAULT_FONT_SIZE = 16
 const val UPDATE_APP_CHANGELOG_UNVIEWED = "UPDATE AppSettings SET viewed_changelog = 0"
@@ -501,7 +503,10 @@ abstract class AppDB : RoomDatabase() {
     }
 }
 
-class AccountViewModel(private val repository: AccountRepository) : ViewModel() {
+@HiltViewModel
+class AccountViewModel @Inject constructor(
+    private val repository: AccountRepository,
+) : ViewModel() {
 
     val allAccounts = repository.allAccounts
 
@@ -535,7 +540,10 @@ class AccountViewModelFactory(private val repository: AccountRepository) :
     }
 }
 
-class AppSettingsViewModel(private val repository: AppSettingsRepository) : ViewModel() {
+@HiltViewModel
+class AppSettingsViewModel @Inject constructor(
+    private val repository: AppSettingsRepository,
+) : ViewModel() {
 
     val appSettings = repository.appSettings
     val changelog = repository.changelog

@@ -12,6 +12,7 @@ import androidx.navigation.NavController
 import com.jerboa.R
 import com.jerboa.api.API
 import com.jerboa.api.ApiState
+import com.jerboa.api.HostInfo
 import com.jerboa.api.MINIMUM_API_VERSION
 import com.jerboa.api.apiWrapper
 import com.jerboa.api.retrofitErrorHandler
@@ -19,93 +20,69 @@ import com.jerboa.compareVersions
 import com.jerboa.datatypes.types.GetSite
 import com.jerboa.datatypes.types.Login
 import com.jerboa.db.Account
+import com.jerboa.db.AccountRepository
 import com.jerboa.db.AccountViewModel
 import com.jerboa.getHostFromInstanceString
 import com.jerboa.serializeToMap
 import com.jerboa.ui.components.common.toHome
 import com.jerboa.ui.components.home.SiteViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class LoginViewModel : ViewModel() {
+interface LoginError {
+    class NotALemmyInstance(val instance: String): LoginError
 
+    class IncorrectLogin: LoginError
+
+    class FailedLoadingUserData: LoginError
+
+    class ServerVersionOutdated(val siteVersion: String): LoginError
+}
+
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val accountRepository: AccountRepository,
+) : ViewModel() {
     var loading by mutableStateOf(false)
         private set
 
-    fun login(
-        instance: String,
-        form: Login,
-        navController: NavController,
-        accountViewModel: AccountViewModel,
-        siteViewModel: SiteViewModel,
-        ctx: Context,
-    ) {
-        val originalInstance = API.currentInstance
-        val api = API.changeLemmyInstance(getHostFromInstanceString(instance))
-        var jwt: String
+    var error by mutableStateOf<LoginError?>(null)
+        private set
+
+    fun login(instance: String, form: Login) {
+        val api = HostInfo(instance).api
+
+        loading = true
+        error = null
 
         viewModelScope.launch {
-            try {
-                loading = true
-                try {
-                    jwt = retrofitErrorHandler(api.login(form = form)).jwt!! // TODO this needs
-                    // to be checked,
-                } catch (e: java.net.UnknownHostException) {
-                    loading = false
-                    val msg = ctx.getString(
-                        R.string.login_view_model_is_not_a_lemmy_instance,
-                        instance,
-                    )
-                    Log.e("login", e.toString())
-                    Toast.makeText(
-                        ctx,
-                        msg,
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    API.changeLemmyInstance(originalInstance)
-                    this.cancel()
-                    return@launch
-                }
+            val jwt = try {
+                // TODO this needs to be checked,
+                retrofitErrorHandler(api.login(form = form)).jwt!!
             } catch (e: Exception) {
-                loading = false
-                val msg = ctx.getString(R.string.login_view_model_incorrect_login)
                 Log.e("login", e.toString())
-                Toast.makeText(
-                    ctx,
-                    msg,
-                    Toast.LENGTH_SHORT,
-                ).show()
-                API.changeLemmyInstance(originalInstance)
-                this.cancel()
+                error = when (e) {
+                    is java.net.UnknownHostException -> LoginError.NotALemmyInstance(instance)
+                    else -> LoginError.IncorrectLogin()
+                }
+                loading = false
                 return@launch
             }
 
             // Fetch the site to get your name and id
             // Can't do a co-routine within a co-routine
-            val getSiteForm = GetSite(auth = jwt)
-            siteViewModel.siteRes = apiWrapper(API.getInstance().getSite(getSiteForm.serializeToMap()))
-
-            when (val siteRes = siteViewModel.siteRes) {
-                is ApiState.Failure -> {
-                    Toast.makeText(
-                        ctx,
-                        siteRes.msg.message,
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
+            when (val siteRes = apiWrapper(api.getSite(GetSite(auth = jwt).serializeToMap()))) {
+                is ApiState.Failure -> LoginError.FailedLoadingUserData()
                 is ApiState.Success -> {
                     val siteVersion = siteRes.data.version
                     if (compareVersions(siteVersion, MINIMUM_API_VERSION) < 0) {
-                        val message = ctx.resources.getString(
-                            R.string.dialogs_server_version_outdated_short,
-                            siteVersion,
-                        )
-                        Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
-                    }
-
-                    try {
+                        error = LoginError.ServerVersionOutdated(siteVersion)
+                    } else {
                         val luv = siteRes.data.my_user!!.local_user_view
                         val account = Account(
+                            // Check if the id is unique across instances.
                             id = luv.person.id,
                             name = luv.person.name,
                             current = true,
@@ -116,25 +93,16 @@ class LoginViewModel : ViewModel() {
                         )
 
                         // Remove the default account
-                        accountViewModel.removeCurrent()
+                        accountRepository.removeCurrent()
 
                         // Save that info in the DB
-                        accountViewModel.insert(account)
-                    } catch (e: Exception) {
-                        loading = false
-                        Log.e("login", e.toString())
-                        API.changeLemmyInstance(originalInstance)
-                        this.cancel()
-                        return@launch
+                        accountRepository.insert(account)
                     }
-
-                    loading = false
-
-                    navController.toHome()
                 }
 
                 else -> {}
             }
+            loading = false
         }
     }
 }

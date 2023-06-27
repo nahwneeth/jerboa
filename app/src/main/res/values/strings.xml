@@ -334,4 +334,8 @@
     <string name="generic_error">An error has occurred</string>
     <string name="create_edit_post_close">Close</string>
     <string name="lang_language">Language</string>
+    <string name="failed_to_retrieve_site_user_info"><![CDATA[Failed to retrieve site & user info.]]></string>
+    <string name="retry">Retry</string>
+    <string name="loading_site_account_info"><![CDATA[Loading site & account info.]]></string>
+    <string name="error_retrieving_user_info">Error retreiving user info.</string>
 </resources>

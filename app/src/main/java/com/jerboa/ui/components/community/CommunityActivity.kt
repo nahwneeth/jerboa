@@ -67,6 +67,7 @@ import com.jerboa.ui.components.common.toProfile
 import com.jerboa.ui.components.home.SiteViewModel
 import com.jerboa.ui.components.post.PostListings
 import com.jerboa.ui.components.post.edit.PostEditReturn
+import com.jerboa.ui.components.settings.account.defaultSortType
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -102,7 +103,7 @@ fun CommunityActivity(
 
         communityViewModel.resetPage()
         account?.let {
-            communityViewModel.updateSortType(SortType.values().getOrElse(account.defaultSortType) { siteViewModel.sortType })
+            communityViewModel.updateSortType(account.defaultSortType())
         }
         communityViewModel.getCommunity(
             form = GetCommunity(
